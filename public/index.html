@@ -3,380 +3,1960 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
 <title>CodeMind AI</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
 :root{
-  --bg:#0a0d14; --bg2:#0e131d; --panel:rgba(255,255,255,.035);
-  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+  --bg:#0a0d14;
+  --bg2:#0e131d;
+  --panel:rgba(255,255,255,.035);
+  --border:rgba(255,255,255,.08);
+  --border2:rgba(255,255,255,.14);
   --grad:linear-gradient(135deg,#4f7cff,#8b5cf6);
-  --text:#e7e9f0; --muted:#8993a8; --muted2:#5d6579;
-  --code-bg:#0d1117; --green:#3ecf8e; --red:#ef5a6f;
-  box-sizing:border-box;
+  --text:#e7e9f0;
+  --muted:#8993a8;
+  --muted2:#5d6579;
+  --code-bg:#0d1117;
+  --green:#3ecf8e;
+  --red:#ef5a6f;
 }
-*{box-sizing:border-box; margin:0; padding:0;}
-html,body{height:100%;}
-body{ font-family:'Cairo',sans-serif; background:var(--bg); color:var(--text); overflow:hidden; font-size:15px; }
-::-webkit-scrollbar{width:6px; height:6px;}
-::-webkit-scrollbar-thumb{background:var(--border2); border-radius:10px;}
-.app{ display:flex; height:100dvh; }
 
-.sidebar{ width:270px; flex-shrink:0; background:var(--bg2); border-left:1px solid var(--border); display:flex; flex-direction:column; padding:16px 14px; gap:14px; overflow-y:auto; transition:transform .3s ease; }
-.brand{ display:flex; align-items:center; gap:10px; padding:4px 4px 10px; }
-.brand-icon{ width:34px; height:34px; border-radius:9px; background:var(--grad); display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono'; font-weight:600; font-size:13px; color:#fff; flex-shrink:0; }
-.brand-text .name{ font-weight:800; font-size:1.02rem; }
-.brand-text .tag{ font-size:.68rem; color:var(--muted); letter-spacing:.5px; }
-.new-chat{ display:flex; align-items:center; gap:8px; justify-content:center; background:var(--grad); color:#fff; border:none; border-radius:10px; padding:11px; font-family:'Cairo'; font-weight:600; font-size:.88rem; cursor:pointer; box-shadow:0 6px 18px -6px rgba(79,124,255,.5); }
-.side-label{ font-size:.68rem; color:var(--muted2); letter-spacing:.4px; padding:10px 6px 2px; font-weight:600; }
-.chat-item{ padding:9px 10px; border-radius:8px; font-size:.82rem; color:var(--muted); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.chat-item:hover{ background:var(--panel); color:var(--text); }
-.chat-item.active{ background:rgba(79,124,255,.12); color:#a9bdff; border:1px solid rgba(79,124,255,.25); }
-.sidebar-footer{ margin-top:auto; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--border); padding-top:10px; }
-.foot-item{ display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:8px; font-size:.85rem; color:var(--muted); }
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
 
-.main{ flex:1; display:flex; flex-direction:column; min-width:0; position:relative; background: radial-gradient(ellipse 700px 400px at 70% -5%, rgba(139,92,246,.09), transparent), radial-gradient(ellipse 700px 400px at 20% 0%, rgba(79,124,255,.08), transparent), var(--bg); }
-.topbar{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
-.menu-btn{ display:none; background:none; border:none; color:var(--text); font-size:1.2rem; cursor:pointer; }
-.mode-select{ display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--border); padding:7px 13px; border-radius:20px; font-size:.8rem; cursor:pointer; color:var(--text); }
-.mode-dot{ width:7px; height:7px; border-radius:50%; background:var(--green); }
-.model-badge{ font-size:.75rem; color:var(--muted); border:1px solid var(--border); padding:6px 12px; border-radius:20px; }
+html,
+body{
+  height:100%;
+}
 
-.chat-scroll{ flex:1; overflow-y:auto; padding:26px 18px; scroll-behavior:smooth; }
-.wrap{ max-width:760px; margin:0 auto; }
-.hero{ text-align:center; padding:40px 10px 26px; }
-.hero-icon{ width:56px; height:56px; border-radius:16px; background:var(--grad); margin:0 auto 18px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-.hero-icon img{ width:100%; height:100%; object-fit:cover; }
-.hero h1{ font-size:1.7rem; font-weight:800; margin-bottom:8px; }
-.hero p.lead{ color:var(--muted); font-size:.95rem; margin-bottom:6px; }
-.hero p.desc{ color:var(--muted2); font-size:.83rem; max-width:480px; margin:0 auto; line-height:1.8; }
-.cards-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin:26px 0 8px; }
-.sugg-card{ background:var(--panel); border:1px solid var(--border); border-radius:13px; padding:15px; cursor:pointer; text-align:right; }
-.sugg-card:hover{ border-color:rgba(79,124,255,.4); }
-.sugg-card .t{ font-weight:600; font-size:.86rem; margin-bottom:3px; }
-.sugg-card .d{ font-size:.75rem; color:var(--muted2); }
+body{
+  font-family:'Cairo',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  font-size:15px;
+}
 
-.msg{ display:flex; gap:12px; margin-bottom:22px; align-items:flex-start; }
-.msg.user{ flex-direction:row-reverse; }
-.avatar{ width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:700; }
-.avatar.ai{ background:var(--grad); color:#fff; font-family:'JetBrains Mono'; overflow:hidden; }
-.avatar.ai img{ width:100%; height:100%; object-fit:cover; }
-.avatar.user{ background:var(--panel); border:1px solid var(--border); color:var(--muted); }
-.bubble{ max-width:100%; width:100%; }
-.msg.user .bubble{ background:rgba(79,124,255,.14); border:1px solid rgba(79,124,255,.25); border-radius:14px 4px 14px 14px; padding:11px 15px; font-size:.88rem; width:fit-content; }
-.msg.ai .bubble{ font-size:.95rem; line-height:1.9; }
+button,
+textarea{
+  font-family:inherit;
+}
 
-.code-block{ background:var(--code-bg); border:1px solid var(--border); border-radius:11px; overflow:hidden; margin:14px 0; direction:ltr; }
-.code-head{ display:flex; justify-content:space-between; align-items:center; padding:8px 14px; background:rgba(255,255,255,.04); border-bottom:1px solid var(--border); }
-.code-lang{ font-family:'JetBrains Mono'; font-size:.72rem; color:var(--muted); text-transform:uppercase; }
-.code-actions button{ background:none; border:1px solid var(--border); color:var(--text); font-size:.7rem; cursor:pointer; padding:4px 10px; border-radius:6px; font-family:'Cairo'; }
-.code-body{ padding:12px 16px; font-family:'JetBrains Mono',monospace; font-size:.85rem; line-height:1.6; overflow-x:auto; text-align:left; color:#d4d4d4; white-space:pre-wrap; }
-.inline-code{ background:var(--panel); border:1px solid var(--border); padding:2px 6px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:.85em; color:#a9bdff; }
-.ai-text strong{ color:#fff; }
-.tk-kw{ color:#c586c0; font-weight:bold; } .tk-fn{ color:#dcdcaa; } .tk-str{ color:#ce9178; } .tk-com{ color:#6a9955; font-style:italic; } .tk-num{ color:#b5cea8; }
+::-webkit-scrollbar{
+  width:6px;
+  height:6px;
+}
 
-.msg-actions{ display:flex; gap:4px; margin-top:8px; }
-.msg-actions button{ background:none; border:1px solid transparent; color:var(--muted2); font-size:.78rem; cursor:pointer; padding:5px 8px; border-radius:7px; }
-.msg-actions button:hover{ background:var(--panel); border-color:var(--border); color:var(--text); }
+::-webkit-scrollbar-thumb{
+  background:var(--border2);
+  border-radius:10px;
+}
 
-.input-zone{ padding:14px 18px 18px; flex-shrink:0; }
-.input-box{ max-width:760px; margin:0 auto; background:var(--panel); border:1px solid var(--border2); border-radius:18px; padding:12px 14px; backdrop-filter:blur(10px); }
-.input-box textarea{ width:100%; background:none; border:none; outline:none; resize:none; color:var(--text); font-family:'Cairo'; font-size:.9rem; max-height:150px; line-height:1.7; }
-.input-tools{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
-.input-actions{ display:flex; align-items:center; gap:6px; }
-.tool-btn{ width:34px; height:34px; border:1px solid var(--border); border-radius:10px; background:var(--panel); color:var(--muted); cursor:pointer; font-size:1rem; }
-.tool-btn:hover,.tool-btn.active{ color:#fff; border-color:rgba(79,124,255,.55); background:rgba(79,124,255,.16); }
-.tool-btn.active{ color:#ff8b9b; }
-.send-btn{ width:34px; height:34px; border-radius:10px; background:var(--grad); border:none; color:#fff; cursor:pointer; font-size:1rem; }
-.hint-row{ text-align:center; font-size:.68rem; color:var(--muted2); margin-top:9px; }
-.err-banner{ text-align:center; font-size:.78rem; color:var(--red); padding:8px; }
+.app{
+  display:flex;
+  height:100dvh;
+}
 
-.overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:20; }
+/* ================= SIDEBAR ================= */
+
+.sidebar{
+  width:270px;
+  flex-shrink:0;
+  background:var(--bg2);
+  border-left:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  padding:16px 14px;
+  gap:14px;
+  overflow-y:auto;
+  transition:transform .3s ease;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:4px 4px 10px;
+}
+
+.brand-icon{
+  width:34px;
+  height:34px;
+  border-radius:9px;
+  background:var(--grad);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'JetBrains Mono';
+  font-weight:600;
+  font-size:13px;
+  color:#fff;
+  flex-shrink:0;
+}
+
+.brand-text .name{
+  font-weight:800;
+  font-size:1.02rem;
+}
+
+.brand-text .tag{
+  font-size:.68rem;
+  color:var(--muted);
+  letter-spacing:.5px;
+}
+
+.new-chat{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:center;
+  background:var(--grad);
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  padding:11px;
+  font-family:'Cairo';
+  font-weight:600;
+  font-size:.88rem;
+  cursor:pointer;
+  box-shadow:0 6px 18px -6px rgba(79,124,255,.5);
+}
+
+.new-chat:hover{
+  opacity:.9;
+}
+
+.side-label{
+  font-size:.68rem;
+  color:var(--muted2);
+  letter-spacing:.4px;
+  padding:10px 6px 2px;
+  font-weight:600;
+}
+
+.chat-item{
+  padding:9px 10px;
+  border-radius:8px;
+  font-size:.82rem;
+  color:var(--muted);
+}
+
+.sidebar-footer{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  border-top:1px solid var(--border);
+  padding-top:10px;
+}
+
+.foot-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:9px 8px;
+  border-radius:8px;
+  font-size:.85rem;
+  color:var(--muted);
+}
+
+/* ================= MAIN ================= */
+
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  position:relative;
+
+  background:
+    radial-gradient(
+      ellipse 700px 400px at 70% -5%,
+      rgba(139,92,246,.09),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 700px 400px at 20% 0%,
+      rgba(79,124,255,.08),
+      transparent
+    ),
+    var(--bg);
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 20px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+
+.menu-btn{
+  display:none;
+  background:none;
+  border:none;
+  color:var(--text);
+  font-size:1.2rem;
+  cursor:pointer;
+}
+
+.mode-select{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding:7px 13px;
+  border-radius:20px;
+  font-size:.8rem;
+  cursor:pointer;
+  color:var(--text);
+}
+
+.mode-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--green);
+}
+
+.model-badge{
+  font-size:.75rem;
+  color:var(--muted);
+  border:1px solid var(--border);
+  padding:6px 12px;
+  border-radius:20px;
+}
+
+/* ================= CHAT ================= */
+
+.chat-scroll{
+  flex:1;
+  overflow-y:auto;
+  padding:26px 18px;
+  scroll-behavior:smooth;
+}
+
+.wrap{
+  max-width:760px;
+  margin:0 auto;
+}
+
+.hero{
+  text-align:center;
+  padding:40px 10px 26px;
+}
+
+.hero-icon{
+  width:56px;
+  height:56px;
+  border-radius:16px;
+  background:var(--grad);
+  margin:0 auto 18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+
+.hero-icon img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.hero h1{
+  font-size:1.7rem;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.hero p.lead{
+  color:var(--muted);
+  font-size:.95rem;
+  margin-bottom:6px;
+}
+
+.hero p.desc{
+  color:var(--muted2);
+  font-size:.83rem;
+  max-width:480px;
+  margin:0 auto;
+  line-height:1.8;
+}
+
+.cards-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:11px;
+  margin:26px 0 8px;
+}
+
+.sugg-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:13px;
+  padding:15px;
+  cursor:pointer;
+  text-align:right;
+}
+
+.sugg-card:hover{
+  border-color:rgba(79,124,255,.4);
+}
+
+.sugg-card .t{
+  font-weight:600;
+  font-size:.86rem;
+  margin-bottom:3px;
+}
+
+.sugg-card .d{
+  font-size:.75rem;
+  color:var(--muted2);
+}
+
+/* ================= MESSAGES ================= */
+
+.msg{
+  display:flex;
+  gap:12px;
+  margin-bottom:22px;
+  align-items:flex-start;
+}
+
+.msg.user{
+  flex-direction:row-reverse;
+}
+
+.avatar{
+  width:30px;
+  height:30px;
+  border-radius:9px;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.75rem;
+  font-weight:700;
+}
+
+.avatar.ai{
+  background:var(--grad);
+  color:#fff;
+  font-family:'JetBrains Mono';
+  overflow:hidden;
+}
+
+.avatar.ai img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.avatar.user{
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--muted);
+}
+
+.bubble{
+  max-width:100%;
+  width:100%;
+}
+
+.msg.user .bubble{
+  background:rgba(79,124,255,.14);
+  border:1px solid rgba(79,124,255,.25);
+  border-radius:14px 4px 14px 14px;
+  padding:11px 15px;
+  font-size:.88rem;
+  width:fit-content;
+  max-width:min(650px,100%);
+}
+
+.msg.ai .bubble{
+  font-size:.95rem;
+  line-height:1.9;
+}
+
+.ai-text{
+  word-wrap:break-word;
+  overflow-wrap:anywhere;
+}
+
+/* ================= CODE ================= */
+
+.code-block{
+  background:var(--code-bg);
+  border:1px solid var(--border);
+  border-radius:11px;
+  overflow:hidden;
+  margin:14px 0;
+  direction:ltr;
+}
+
+.code-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:8px 14px;
+  background:rgba(255,255,255,.04);
+  border-bottom:1px solid var(--border);
+}
+
+.code-lang{
+  font-family:'JetBrains Mono';
+  font-size:.72rem;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+
+.code-actions button{
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text);
+  font-size:.7rem;
+  cursor:pointer;
+  padding:4px 10px;
+  border-radius:6px;
+  font-family:'Cairo';
+}
+
+.code-body{
+  padding:12px 16px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:.85rem;
+  line-height:1.6;
+  overflow-x:auto;
+  text-align:left;
+  color:#d4d4d4;
+  white-space:pre-wrap;
+}
+
+.inline-code{
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding:2px 6px;
+  border-radius:6px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:.85em;
+  color:#a9bdff;
+}
+
+.ai-text strong{
+  color:#fff;
+}
+
+.tk-kw{
+  color:#c586c0;
+  font-weight:bold;
+}
+
+.tk-fn{
+  color:#dcdcaa;
+}
+
+.tk-str{
+  color:#ce9178;
+}
+
+.tk-com{
+  color:#6a9955;
+  font-style:italic;
+}
+
+.tk-num{
+  color:#b5cea8;
+}
+
+/* ================= MESSAGE ACTIONS ================= */
+
+.msg-actions{
+  display:flex;
+  gap:4px;
+  margin-top:8px;
+}
+
+.msg-actions button{
+  background:none;
+  border:1px solid transparent;
+  color:var(--muted2);
+  font-size:.78rem;
+  cursor:pointer;
+  padding:5px 8px;
+  border-radius:7px;
+}
+
+.msg-actions button:hover{
+  background:var(--panel);
+  border-color:var(--border);
+  color:var(--text);
+}
+
+/* ================= INPUT ================= */
+
+.input-zone{
+  padding:14px 18px 18px;
+  flex-shrink:0;
+}
+
+.input-box{
+  max-width:760px;
+  margin:0 auto;
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:18px;
+  padding:12px 14px;
+  backdrop-filter:blur(10px);
+}
+
+.input-box textarea{
+  display:block;
+  width:100%;
+  min-height:28px;
+  background:none;
+  border:none;
+  outline:none;
+  resize:none;
+  color:var(--text);
+  font-family:'Cairo';
+  font-size:.9rem;
+  max-height:150px;
+  line-height:1.7;
+  direction:rtl;
+}
+
+.input-box textarea::placeholder{
+  color:var(--muted2);
+}
+
+.input-tools{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:8px;
+}
+
+.input-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.tool-btn{
+  width:34px;
+  height:34px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--panel);
+  color:var(--muted);
+  cursor:pointer;
+  font-size:1rem;
+}
+
+.tool-btn:hover,
+.tool-btn.active{
+  color:#fff;
+  border-color:rgba(79,124,255,.55);
+  background:rgba(79,124,255,.16);
+}
+
+.tool-btn.active{
+  color:#ff8b9b;
+}
+
+.send-btn{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  background:var(--grad);
+  border:none;
+  color:#fff;
+  cursor:pointer;
+  font-size:1rem;
+}
+
+.send-btn:hover{
+  opacity:.9;
+}
+
+.send-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
+.hint-row{
+  text-align:center;
+  font-size:.68rem;
+  color:var(--muted2);
+  margin-top:9px;
+}
+
+.err-banner{
+  text-align:center;
+  font-size:.78rem;
+  color:var(--red);
+  padding:8px;
+  min-height:1px;
+}
+
+/* ================= SIDEBAR OVERLAY ================= */
+
+.overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.5);
+  z-index:20;
+}
+
+/* ================= RESPONSIVE ================= */
+
 @media (max-width:860px){
-  .sidebar{ position:fixed; z-index:30; top:0; bottom:0; right:0; transform:translateX(100%); }
-  .sidebar.open{ transform:translateX(0); }
-  .menu-btn{ display:block; }
-  .overlay.show{ display:block; }
-  .cards-grid{ grid-template-columns:1fr; }
+
+  .sidebar{
+    position:fixed;
+    z-index:30;
+    top:0;
+    bottom:0;
+    right:0;
+    transform:translateX(100%);
+  }
+
+  .sidebar.open{
+    transform:translateX(0);
+  }
+
+  .menu-btn{
+    display:block;
+  }
+
+  .overlay.show{
+    display:block;
+  }
+
+  .cards-grid{
+    grid-template-columns:1fr;
+  }
+
+  .model-badge{
+    display:none;
+  }
+
+  .topbar{
+    padding:10px 14px;
+  }
+
+  .chat-scroll{
+    padding:18px 12px;
+  }
+
+  .input-zone{
+    padding:10px 10px 14px;
+  }
 }
 </style>
 </head>
+
 <body>
+
 <div class="app">
-  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <!-- OVERLAY -->
+  <div
+    class="overlay"
+    id="overlay"
+    onclick="toggleSidebar()">
+  </div>
+
+  <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
+
     <div class="brand">
-      <div class="brand-icon">&lt;/&gt;</div>
-      <div class="brand-text"><div class="name">CodeMind AI</div><div class="tag">فكّر • برمج • ابنِ</div></div>
+
+      <div class="brand-icon">
+        &lt;/&gt;
+      </div>
+
+      <div class="brand-text">
+        <div class="name">CodeMind AI</div>
+        <div class="tag">فكّر • برمج • ابنِ</div>
+      </div>
+
     </div>
-    <button class="new-chat" id="newChatBtn">+ &nbsp; محادثة جديدة</button>
+
+    <button
+      class="new-chat"
+      id="newChatBtn"
+      type="button">
+      + &nbsp; محادثة جديدة
+    </button>
+
     <div>
-      <div class="side-label">المحادثات السابقة</div>
-      <div id="sidebarChats"></div>
+
+      <div class="side-label">
+        CodeMind AI
+      </div>
+
+      <div class="chat-item">
+        محادثة بدون قاعدة بيانات
+      </div>
+
     </div>
+
     <div class="sidebar-footer">
-      <div class="foot-item">⚙️ الإعدادات</div>
-      <div class="foot-item">👤 الحساب الشخصي</div>
+
+      <div class="foot-item">
+        ⚙️ الإعدادات
+      </div>
+
+      <div class="foot-item">
+        👤 الحساب الشخصي
+      </div>
+
     </div>
+
   </aside>
 
+
+  <!-- MAIN -->
   <main class="main">
+
+    <!-- TOPBAR -->
     <div class="topbar">
-      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-      <div class="mode-select" id="modeSelect"><span class="mode-dot"></span> <span id="modeLabel">💻 خبير برمجة</span></div>
-      <div class="model-badge">CodeMind — Real AI</div>
+
+      <button
+        class="menu-btn"
+        id="menuBtn"
+        type="button">
+        ☰
+      </button>
+
+      <div
+        class="mode-select"
+        id="modeSelect">
+
+        <span class="mode-dot"></span>
+
+        <span id="modeLabel">
+          💻 خبير برمجة
+        </span>
+
+      </div>
+
+      <div class="model-badge">
+        CodeMind — Real AI
+      </div>
+
     </div>
 
-    <div class="chat-scroll" id="chatScroll">
+
+    <!-- CHAT -->
+    <div
+      class="chat-scroll"
+      id="chatScroll">
+
       <div class="wrap">
+
+        <!-- HERO -->
         <div id="heroSection">
+
           <div class="hero">
-            <div class="hero-icon"><img src="/logo.png" alt="CodeMind AI"></div>
-            <h1>CodeMind AI</h1>
-            <p class="lead">مساعدك الذكي في البرمجة والتقنية</p>
-            <p class="desc">اكتب الكود، أصلح الأخطاء، ابنِ المشاريع، وتعلّم البرمجة باستخدام الذكاء الاصطناعي.</p>
+
+            <div class="hero-icon">
+              <img
+                src="/logo.png"
+                alt="CodeMind AI">
+            </div>
+
+            <h1>
+              CodeMind AI
+            </h1>
+
+            <p class="lead">
+              مساعدك الذكي في البرمجة والتقنية
+            </p>
+
+            <p class="desc">
+              اكتب الكود، أصلح الأخطاء، ابنِ المشاريع،
+              وتعلّم البرمجة باستخدام الذكاء الاصطناعي.
+            </p>
+
           </div>
+
+
           <div class="cards-grid">
-            <div class="sugg-card"><div class="t">💻 كتابة كود</div><div class="d">أنشئ صفحة تسجيل دخول باستخدام React</div></div>
-            <div class="sugg-card"><div class="t">🐛 إصلاح الأخطاء</div><div class="d">اكتشف الخطأ الموجود في كود PHP وأصلحه</div></div>
+
+            <div
+              class="sugg-card"
+              data-text="أنشئ صفحة تسجيل دخول باستخدام React">
+
+              <div class="t">
+                💻 كتابة كود
+              </div>
+
+              <div class="d">
+                أنشئ صفحة تسجيل دخول باستخدام React
+              </div>
+
+            </div>
+
+
+            <div
+              class="sugg-card"
+              data-text="اكتشف الخطأ الموجود في كود PHP وأصلحه">
+
+              <div class="t">
+                🐛 إصلاح الأخطاء
+              </div>
+
+              <div class="d">
+                اكتشف الخطأ الموجود في كود PHP وأصلحه
+              </div>
+
+            </div>
+
           </div>
+
         </div>
+
+
+        <!-- MESSAGES -->
         <div id="messagesContainer"></div>
-        <div id="statusBanner" class="err-banner"></div>
+
+
+        <!-- STATUS -->
+        <div
+          id="statusBanner"
+          class="err-banner">
+        </div>
+
       </div>
+
     </div>
 
+
+    <!-- INPUT -->
     <div class="input-zone">
+
       <div class="input-box">
-        <textarea rows="1" placeholder="اسأل CodeMind AI عن أي شيء في البرمجة..." id="ta" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+
+        <textarea
+          rows="1"
+          id="ta"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="اسأل CodeMind AI عن أي شيء في البرمجة...">
+        </textarea>
+
+
         <div class="input-tools">
+
           <div class="input-actions">
-            <button class="tool-btn" id="micBtn" type="button" title="التحدث إلى CodeMind AI" aria-label="التحدث إلى CodeMind AI">🎙️</button>
+
+            <button
+              class="tool-btn"
+              id="micBtn"
+              type="button"
+              title="التحدث إلى CodeMind AI"
+              aria-label="التحدث إلى CodeMind AI">
+
+              🎙️
+
+            </button>
+
           </div>
-          <button class="send-btn" id="sendBtn">➤</button>
+
+
+          <button
+            class="send-btn"
+            id="sendBtn"
+            type="button"
+            aria-label="إرسال">
+
+            ➤
+
+          </button>
+
         </div>
+
       </div>
-      <div class="hint-row">CodeMind AI قد يخطئ أحياناً — راجع الأكواد المهمة قبل الاستخدام</div>
+
+
+      <div class="hint-row">
+        CodeMind AI قد يخطئ أحياناً — راجع الأكواد المهمة قبل الاستخدام
+      </div>
+
     </div>
+
   </main>
+
 </div>
 
+
 <script>
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
 function toggleSidebar(){
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('show');
-}
-document.querySelectorAll('.sugg-card').forEach(c=>{
-  c.addEventListener('click', ()=>{
-    const ta = document.getElementById('ta');
-    ta.value = c.querySelector('.d').textContent;
-    ta.focus();
-  });
-});
 
-function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  document
+    .getElementById('sidebar')
+    .classList
+    .toggle('open');
+
+  document
+    .getElementById('overlay')
+    .classList
+    .toggle('show');
+
+}
+
+
+/* =========================================================
+   ELEMENTS
+========================================================= */
+
+const ta =
+  document.getElementById('ta');
+
+const sendBtn =
+  document.getElementById('sendBtn');
+
+const micBtn =
+  document.getElementById('micBtn');
+
+const messagesContainer =
+  document.getElementById('messagesContainer');
+
+const heroSection =
+  document.getElementById('heroSection');
+
+const statusBanner =
+  document.getElementById('statusBanner');
+
+const chatScroll =
+  document.getElementById('chatScroll');
+
+
+/* =========================================================
+   TEXTAREA
+========================================================= */
+
+function resizeTextarea(){
+
+  ta.style.height = 'auto';
+
+  ta.style.height =
+    Math.min(ta.scrollHeight,150) + 'px';
+
+}
+
+ta.addEventListener('input', resizeTextarea);
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(text){
+
+  return String(text || '').replace(
+    /[&<>"']/g,
+    function(match){
+
+      const map = {
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      };
+
+      return map[match];
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   CODE HIGHLIGHT
+========================================================= */
+
 function syntaxHighlight(code){
-  return code
-    .replace(/(".*?"|'.*?'|`.*?`)/g,'<span class="tk-str">$1</span>')
-    .replace(/\b(function|const|let|var|return|if|else|for|while|class|import|export|from|async|await|=>)\b/g,'<span class="tk-kw">$1</span>')
-    .replace(/(\/\/.*)/g,'<span class="tk-com">$1</span>')
-    .replace(/\b(\d+)\b/g,'<span class="tk-num">$1</span>');
-}
-function parseMarkdown(text){
-  let html = escapeHtml(text);
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (m, lang, code)=>{
-    const hl = syntaxHighlight(code);
-    return '<div class="code-block"><div class="code-head"><span class="code-lang">'+(lang||'code')+'</span><div class="code-actions"><button onclick="copyText(this,\''+encodeURIComponent(code)+'\')">📋 نسخ الكود</button></div></div><div class="code-body">'+hl+'</div></div>';
-  });
-  html = html.replace(/`([^`]+)`/g,'<span class="inline-code">$1</span>');
-  html = html.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-  html = html.replace(/\n/g,'<br>');
-  return html;
-}
-function copyText(btn, encoded){
-  navigator.clipboard.writeText(decodeURIComponent(encoded)).then(()=>{
-    const o = btn.innerHTML; btn.innerHTML='✅ تم'; setTimeout(()=>btn.innerHTML=o, 1800);
-  });
-}
-let activeSpeech = null;
-function speakText(btn, encoded){
-  if(!('speechSynthesis' in window)){
-    document.getElementById('statusBanner').textContent='⚠️ المتصفح لا يدعم قراءة النصوص صوتيًا.';
-    return;
-  }
-  window.speechSynthesis.cancel();
-  if(activeSpeech === btn){ activeSpeech = null; return; }
-  const text = decodeURIComponent(encoded);
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = /[\u0600-\u06FF]/.test(text) ? 'ar-SA' : 'en-US';
-  utterance.rate = 0.95;
-  utterance.onend = ()=>{ if(activeSpeech === btn) activeSpeech = null; btn.textContent='🔊 استماع'; };
-  activeSpeech = btn;
-  btn.textContent='⏹ إيقاف';
-  window.speechSynthesis.speak(utterance);
+
+  return escapeHtml(code)
+
+    .replace(
+      /(".*?"|'.*?'|`.*?`)/g,
+      '<span class="tk-str">$1</span>'
+    )
+
+    .replace(
+      /\b(function|const|let|var|return|if|else|for|while|class|import|export|from|async|await)\b/g,
+      '<span class="tk-kw">$1</span>'
+    )
+
+    .replace(
+      /(\/\/.*)/g,
+      '<span class="tk-com">$1</span>'
+    )
+
+    .replace(
+      /\b(\d+)\b/g,
+      '<span class="tk-num">$1</span>'
+    );
+
 }
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const micBtn = document.getElementById('micBtn');
-const ta = document.getElementById('ta');
+
+/* =========================================================
+   MARKDOWN
+========================================================= */
+
+function parseMarkdown(text){
+
+  let html =
+    escapeHtml(text);
+
+
+  /*
+    Code blocks
+  */
+
+  html =
+    html.replace(
+      /```([\w+-]+)?\n?([\s\S]*?)```/g,
+      function(match,lang,code){
+
+        const cleanCode =
+          code.replace(/^\n|\n$/g,'');
+
+        const encoded =
+          encodeURIComponent(cleanCode);
+
+        return `
+          <div class="code-block">
+
+            <div class="code-head">
+
+              <span class="code-lang">
+                ${lang || 'code'}
+              </span>
+
+              <div class="code-actions">
+
+                <button
+                  type="button"
+                  onclick="copyText(this,'${encoded}')">
+
+                  📋 نسخ الكود
+
+                </button>
+
+              </div>
+
+            </div>
+
+            <div class="code-body">
+              ${syntaxHighlight(cleanCode)}
+            </div>
+
+          </div>
+        `;
+
+      }
+    );
+
+
+  /*
+    Inline code
+  */
+
+  html =
+    html.replace(
+      /`([^`]+)`/g,
+      '<span class="inline-code">$1</span>'
+    );
+
+
+  /*
+    Bold
+  */
+
+  html =
+    html.replace(
+      /\*\*([^*]+)\*\*/g,
+      '<strong>$1</strong>'
+    );
+
+
+  /*
+    New lines
+  */
+
+  html =
+    html.replace(
+      /\n/g,
+      '<br>'
+    );
+
+
+  return html;
+
+}
+
+
+/* =========================================================
+   COPY
+========================================================= */
+
+async function copyText(btn,encoded){
+
+  try{
+
+    const text =
+      decodeURIComponent(encoded);
+
+    await navigator.clipboard.writeText(text);
+
+    const old =
+      btn.innerHTML;
+
+    btn.innerHTML =
+      '✅ تم النسخ';
+
+    setTimeout(
+      () => btn.innerHTML = old,
+      1800
+    );
+
+  }catch(error){
+
+    statusBanner.textContent =
+      '⚠️ لم يتمكن المتصفح من نسخ النص.';
+
+  }
+
+}
+
+
+/* =========================================================
+   TEXT TO SPEECH
+========================================================= */
+
+let activeSpeech = null;
+
+function speakText(btn,encoded){
+
+  if(!('speechSynthesis' in window)){
+
+    statusBanner.textContent =
+      '⚠️ المتصفح لا يدعم قراءة النصوص صوتيًا.';
+
+    return;
+
+  }
+
+
+  window.speechSynthesis.cancel();
+
+
+  if(activeSpeech === btn){
+
+    activeSpeech = null;
+
+    return;
+
+  }
+
+
+  const text =
+    decodeURIComponent(encoded);
+
+
+  const utterance =
+    new SpeechSynthesisUtterance(text);
+
+
+  utterance.lang =
+    /[\u0600-\u06FF]/.test(text)
+      ? 'ar-SA'
+      : 'en-US';
+
+
+  utterance.rate =
+    0.95;
+
+
+  utterance.onend =
+    function(){
+
+      if(activeSpeech === btn){
+
+        activeSpeech = null;
+
+        btn.textContent =
+          '🔊 استماع';
+
+      }
+
+    };
+
+
+  activeSpeech = btn;
+
+  btn.textContent =
+    '⏹ إيقاف';
+
+  window.speechSynthesis.speak(
+    utterance
+  );
+
+}
+
+
+/* =========================================================
+   SPEECH RECOGNITION
+========================================================= */
+
+const SpeechRecognition =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
 let recognition = null;
 let isListening = false;
 let speechPrefix = '';
 
+
 if(SpeechRecognition){
-  recognition = new SpeechRecognition();
-  recognition.lang = 'ar-SA';
-  recognition.continuous = false;
-  recognition.interimResults = true;
-  recognition.onstart = ()=>{
-    isListening = true;
-    speechPrefix = ta.value.trim() ? ta.value.trim() + ' ' : '';
-    micBtn.classList.add('active');
-    micBtn.textContent = '⏹';
-  };
-  recognition.onresult = event=>{
-    const transcript = Array.from(event.results).map(result=>result[0].transcript).join('');
-    ta.value = speechPrefix + transcript;
-    ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
-  };
-  recognition.onerror = event=>{
-    if(event.error !== 'aborted') document.getElementById('statusBanner').textContent = '⚠️ تعذر تشغيل الميكروفون: ' + event.error;
-  };
-  recognition.onend = ()=>{
-    isListening = false;
-    micBtn.classList.remove('active');
-    micBtn.textContent = '🎙️';
-  };
-  micBtn.addEventListener('click', ()=>{
-    if(isListening) recognition.stop();
-    else recognition.start();
-  });
+
+  recognition =
+    new SpeechRecognition();
+
+  recognition.lang =
+    'ar-SA';
+
+  recognition.continuous =
+    false;
+
+  recognition.interimResults =
+    true;
+
+
+  recognition.onstart =
+    function(){
+
+      isListening = true;
+
+      speechPrefix =
+        ta.value.trim()
+          ? ta.value.trim() + ' '
+          : '';
+
+      micBtn.classList.add('active');
+
+      micBtn.textContent =
+        '⏹';
+
+    };
+
+
+  recognition.onresult =
+    function(event){
+
+      const transcript =
+        Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+
+      ta.value =
+        speechPrefix + transcript;
+
+      resizeTextarea();
+
+    };
+
+
+  recognition.onerror =
+    function(event){
+
+      if(event.error !== 'aborted'){
+
+        statusBanner.textContent =
+          '⚠️ تعذر تشغيل الميكروفون: ' +
+          event.error;
+
+      }
+
+    };
+
+
+  recognition.onend =
+    function(){
+
+      isListening = false;
+
+      micBtn.classList.remove('active');
+
+      micBtn.textContent =
+        '🎙️';
+
+    };
+
+
+  micBtn.addEventListener(
+    'click',
+    function(){
+
+      if(isListening){
+
+        recognition.stop();
+
+      }else{
+
+        try{
+
+          recognition.start();
+
+        }catch(error){
+
+          console.log(error);
+
+        }
+
+      }
+
+    }
+  );
+
 }else{
+
   micBtn.disabled = true;
-  micBtn.title = 'التعرف الصوتي غير مدعوم في هذا المتصفح';
-  micBtn.setAttribute('aria-label', 'التعرف الصوتي غير مدعوم في هذا المتصفح');
+
+  micBtn.title =
+    'التعرف الصوتي غير مدعوم في هذا المتصفح';
+
 }
 
-const MODES = { fast:'⚡ سريع', reason:'🧠 تفكير عميق', code:'💻 خبير برمجة', net:'🌐 خبير شبكات', sec:'🔐 خبير أمن سيبراني' };
-let currentMode = 'code';
-document.getElementById('modeSelect').addEventListener('click', ()=>{
-  const keys = Object.keys(MODES);
-  currentMode = keys[(keys.indexOf(currentMode)+1) % keys.length];
-  document.getElementById('modeLabel').textContent = MODES[currentMode];
-});
 
-let currentChatId = null, generating = false;
+/* =========================================================
+   AI MODES
+========================================================= */
 
-async function loadChats(){
-  const res = await fetch('/api/chats');
-  const chats = await res.json();
-  const el = document.getElementById('sidebarChats');
-  el.innerHTML = chats.length ? '' : '<div class="chat-item" style="color:var(--muted2);cursor:default;">لسه مفيش محادثات</div>';
-  chats.forEach(c=>{
-    const item = document.createElement('div');
-    item.className = 'chat-item' + (c.id===currentChatId ? ' active' : '');
-    item.textContent = c.title || 'محادثة جديدة';
-    item.onclick = ()=>openChat(c.id);
-    el.appendChild(item);
-  });
+const MODES = {
+
+  fast:'⚡ سريع',
+
+  reason:'🧠 تفكير عميق',
+
+  code:'💻 خبير برمجة',
+
+  net:'🌐 خبير شبكات',
+
+  sec:'🔐 خبير أمن سيبراني'
+
+};
+
+
+let currentMode =
+  'code';
+
+
+document
+  .getElementById('modeSelect')
+  .addEventListener(
+    'click',
+    function(){
+
+      const keys =
+        Object.keys(MODES);
+
+      const index =
+        keys.indexOf(currentMode);
+
+      currentMode =
+        keys[
+          (index + 1) % keys.length
+        ];
+
+      document
+        .getElementById('modeLabel')
+        .textContent =
+          MODES[currentMode];
+
+    }
+  );
+
+
+/* =========================================================
+   ADD USER MESSAGE
+========================================================= */
+
+function addUserMessage(text){
+
+  const message =
+    document.createElement('div');
+
+  message.className =
+    'msg user';
+
+  message.innerHTML = `
+    <div class="avatar user">
+      أ
+    </div>
+
+    <div class="bubble">
+      ${escapeHtml(text)}
+    </div>
+  `;
+
+  messagesContainer.appendChild(message);
+
 }
 
-async function openChat(id){
-  currentChatId = id;
-  const res = await fetch('/api/chats/'+id);
-  if(!res.ok) return;
-  const chat = await res.json();
-  renderMessages(chat.messages || []);
-  loadChats();
+
+/* =========================================================
+   ADD AI LOADING
+========================================================= */
+
+function addAiLoading(){
+
+  const message =
+    document.createElement('div');
+
+  message.className =
+    'msg ai';
+
+  message.id =
+    'loadingMessage';
+
+  message.innerHTML = `
+
+    <div class="avatar ai">
+
+      <img
+        src="/logo.png"
+        alt="CodeMind AI">
+
+    </div>
+
+    <div class="bubble">
+
+      <div
+        class="ai-text"
+        id="loadingText">
+
+        جاري التفكير...
+
+      </div>
+
+    </div>
+
+  `;
+
+  messagesContainer.appendChild(message);
+
+  scrollToBottom();
+
 }
 
-async function createNewChat(){
-  const res = await fetch('/api/chats', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({title:'محادثة جديدة'}) });
-  const chat = await res.json();
-  currentChatId = chat.id;
-  renderMessages([]);
-  loadChats();
-  document.getElementById('ta').focus();
+
+/* =========================================================
+   REPLACE AI LOADING WITH RESPONSE
+========================================================= */
+
+function showAiResponse(text){
+
+  const loading =
+    document.getElementById(
+      'loadingMessage'
+    );
+
+
+  if(!loading) return;
+
+
+  const encoded =
+    encodeURIComponent(text);
+
+
+  loading.id = '';
+
+  loading.innerHTML = `
+
+    <div class="avatar ai">
+
+      <img
+        src="/logo.png"
+        alt="CodeMind AI">
+
+    </div>
+
+    <div class="bubble">
+
+      <div class="ai-text">
+
+        ${parseMarkdown(text)}
+
+      </div>
+
+      <div class="msg-actions">
+
+        <button
+          type="button"
+          onclick="speakText(this,'${encoded}')">
+
+          🔊 استماع
+
+        </button>
+
+        <button
+          type="button"
+          onclick="copyText(this,'${encoded}')">
+
+          📋 نسخ الرد
+
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+  scrollToBottom();
+
 }
 
-function renderMessages(messages){
-  const hero = document.getElementById('heroSection');
-  const box = document.getElementById('messagesContainer');
-  if(!messages.length){ hero.style.display=''; box.innerHTML=''; return; }
-  hero.style.display='none';
-  box.innerHTML = messages.map(m=>{
-    if(m.role==='user') return '<div class="msg user"><div class="avatar user">أ</div><div class="bubble">'+escapeHtml(m.text)+'</div></div>';
-    const encoded = encodeURIComponent(m.text || '');
-    return '<div class="msg ai"><div class="avatar ai"><img src="/logo.png" alt="CodeMind AI"></div><div class="bubble"><div class="ai-text">'+parseMarkdown(m.text)+'</div><div class="msg-actions"><button onclick="speakText(this,\''+encoded+'\')">🔊 استماع</button><button onclick="copyText(this,\''+encoded+'\')">📋 نسخ الرد</button></div></div></div>';
-  }).join('');
-  document.getElementById('chatScroll').scrollTop = document.getElementById('chatScroll').scrollHeight;
+
+/* =========================================================
+   SHOW ERROR
+========================================================= */
+
+function showAiError(message){
+
+  const loading =
+    document.getElementById(
+      'loadingMessage'
+    );
+
+
+  if(loading){
+
+    loading.innerHTML = `
+
+      <div class="avatar ai">
+
+        <img
+          src="/logo.png"
+          alt="CodeMind AI">
+
+      </div>
+
+      <div class="bubble">
+
+        <div class="ai-text">
+
+          ⚠️ ${escapeHtml(message)}
+
+        </div>
+
+      </div>
+
+    `;
+
+    loading.id = '';
+
+  }
+
 }
+
+
+/* =========================================================
+   SCROLL
+========================================================= */
+
+function scrollToBottom(){
+
+  setTimeout(
+    function(){
+
+      chatScroll.scrollTop =
+        chatScroll.scrollHeight;
+
+    },
+    20
+  );
+
+}
+
+
+/* =========================================================
+   SEND MESSAGE
+========================================================= */
+
+let generating = false;
+
 
 async function sendMessage(){
-  const ta = document.getElementById('ta');
-  const text = ta.value.trim();
-  if(!text || generating) return;
-  ta.value=''; ta.style.height='auto';
-  document.getElementById('statusBanner').textContent='';
 
-  if(!currentChatId) await createNewChat();
+  const text =
+    ta.value.trim();
 
-  document.getElementById('heroSection').style.display='none';
-  const box = document.getElementById('messagesContainer');
-  box.innerHTML += '<div class="msg user"><div class="avatar user">أ</div><div class="bubble">'+escapeHtml(text)+'</div></div>';
-  box.innerHTML += '<div class="msg ai" id="streamMsg"><div class="avatar ai"><img src="/logo.png" alt="CodeMind AI"></div><div class="bubble"><div class="ai-text" id="streamText">...</div></div></div>';
-  document.getElementById('chatScroll').scrollTop = document.getElementById('chatScroll').scrollHeight;
+
+  /*
+    منع إرسال رسالة فارغة
+  */
+
+  if(!text){
+
+    ta.focus();
+
+    return;
+
+  }
+
+
+  /*
+    منع إرسال أكثر من رسالة
+    في نفس الوقت
+  */
+
+  if(generating){
+
+    return;
+
+  }
+
+
+  /*
+    إظهار واجهة المحادثة
+  */
+
+  heroSection.style.display =
+    'none';
+
+
+  /*
+    تنظيف الرسالة
+  */
+
+  statusBanner.textContent =
+    '';
+
+
+  /*
+    إضافة رسالة المستخدم
+  */
+
+  addUserMessage(text);
+
+
+  /*
+    إضافة loading
+  */
+
+  addAiLoading();
+
+
+  /*
+    تنظيف input
+  */
+
+  ta.value = '';
+
+  resizeTextarea();
+
+
+  /*
+    حالة التحميل
+  */
 
   generating = true;
-  document.getElementById('sendBtn').textContent = '■';
+
+  sendBtn.disabled =
+    true;
+
+  sendBtn.textContent =
+    '■';
+
 
   try{
-    const res = await fetch('/api/chat', {
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body: JSON.stringify({ chatId: currentChatId, message: text, mode: currentMode })
-    });
 
-    if(!res.ok){
-      const err = await res.json().catch(()=>({message:'خطأ غير معروف'}));
-      document.getElementById('statusBanner').textContent = '⚠️ ' + (err.message || 'حصل خطأ في الاتصال بالسيرفر');
-      document.getElementById('streamText').textContent = 'حصل خطأ، شوفي الرسالة فوق.';
+    /*
+      الاتصال بالـBackend
+    */
+
+    const response =
+      await fetch(
+        '/api/chat',
+        {
+          method:'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          body:JSON.stringify({
+
+            message:text,
+
+            mode:currentMode
+
+          })
+
+        }
+      );
+
+
+    /*
+      قراءة JSON
+    */
+
+    const data =
+      await response.json()
+        .catch(
+          () => ({})
+        );
+
+
+    /*
+      Backend Error
+    */
+
+    if(!response.ok){
+
+      const errorMessage =
+        data.message ||
+        'حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.';
+
+      statusBanner.textContent =
+        '⚠️ ' + errorMessage;
+
+      showAiError(
+        errorMessage
+      );
+
       return;
+
     }
 
-    const data = await res.json();
-    const fullText = data.reply || '';
-    if(!fullText){
-      document.getElementById('statusBanner').textContent = '⚠️ وصل رد فارغ من خدمة الذكاء الاصطناعي.';
-      document.getElementById('streamText').textContent = 'لم يصل محتوى للرد.';
+
+    /*
+      AI Response
+    */
+
+    const reply =
+      typeof data.reply === 'string'
+        ? data.reply.trim()
+        : '';
+
+
+    /*
+      Empty Response
+    */
+
+    if(!reply){
+
+      const errorMessage =
+        'وصل رد فارغ من خدمة الذكاء الاصطناعي.';
+
+      statusBanner.textContent =
+        '⚠️ ' + errorMessage;
+
+      showAiError(
+        errorMessage
+      );
+
       return;
-    }
-    document.getElementById('streamText').textContent = fullText;
-    document.getElementById('chatScroll').scrollTop = document.getElementById('chatScroll').scrollHeight;
 
-    const el = document.getElementById('streamMsg');
-    if(el){
-      const encoded = encodeURIComponent(fullText);
-      el.outerHTML = '<div class="msg ai"><div class="avatar ai"><img src="/logo.png" alt="CodeMind AI"></div><div class="bubble"><div class="ai-text">'+parseMarkdown(fullText)+'</div><div class="msg-actions"><button onclick="speakText(this,\''+encoded+'\')">🔊 استماع</button><button onclick="copyText(this,\''+encoded+'\')">📋 نسخ الرد</button></div></div></div>';
     }
-    loadChats();
-  }catch(e){
-    document.getElementById('statusBanner').textContent = '⚠️ تعذّر الاتصال بالسيرفر — اتأكدي إن الـ Backend شغال.';
+
+
+    /*
+      عرض الرد
+    */
+
+    showAiResponse(
+      reply
+    );
+
+
+  }catch(error){
+
+    console.error(
+      'CodeMind API Error:',
+      error
+    );
+
+
+    const errorMessage =
+      'تعذر الاتصال بالسيرفر. تأكد أن Backend يعمل على Vercel.';
+
+
+    statusBanner.textContent =
+      '⚠️ ' + errorMessage;
+
+
+    showAiError(
+      errorMessage
+    );
+
   }finally{
+
     generating = false;
-    document.getElementById('sendBtn').textContent = '➤';
+
+    sendBtn.disabled =
+      false;
+
+    sendBtn.textContent =
+      '➤';
+
+    ta.focus();
+
   }
+
 }
 
-document.getElementById('newChatBtn').addEventListener('click', createNewChat);
-document.getElementById('sendBtn').addEventListener('click', sendMessage);
-document.getElementById('ta').addEventListener('keydown', e=>{
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
-});
 
-loadChats();
+/* =========================================================
+   SEND BUTTON
+========================================================= */
+
+sendBtn.addEventListener(
+  'click',
+  sendMessage
+);
+
+
+/* =========================================================
+   ENTER
+========================================================= */
+
+ta.addEventListener(
+  'keydown',
+  function(event){
+
+    if(
+      event.key === 'Enter' &&
+      !event.shiftKey
+    ){
+
+      event.preventDefault();
+
+      sendMessage();
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   NEW CHAT
+========================================================= */
+
+document
+  .getElementById('newChatBtn')
+  .addEventListener(
+    'click',
+    function(){
+
+      messagesContainer.innerHTML =
+        '';
+
+      heroSection.style.display =
+        '';
+
+      statusBanner.textContent =
+        '';
+
+      ta.value =
+        '';
+
+      resizeTextarea();
+
+      ta.focus();
+
+      if(window.innerWidth <= 860){
+
+        toggleSidebar();
+
+      }
+
+    }
+  );
+
+
+/* =========================================================
+   SUGGESTION CARDS
+========================================================= */
+
+document
+  .querySelectorAll('.sugg-card')
+  .forEach(
+    function(card){
+
+      card.addEventListener(
+        'click',
+        function(){
+
+          const text =
+            card.dataset.text ||
+            card.querySelector('.d')
+              .textContent;
+
+          ta.value =
+            text;
+
+          resizeTextarea();
+
+          ta.focus();
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================================================
+   MENU BUTTON
+========================================================= */
+
+document
+  .getElementById('menuBtn')
+  .addEventListener(
+    'click',
+    toggleSidebar
+  );
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+resizeTextarea();
+
+ta.focus();
+
 </script>
+
 </body>
 </html>
