@@ -15,6 +15,7 @@
   --bg:#0a0d14;
   --bg2:#0e131d;
   --panel:rgba(255,255,255,.035);
+  --panel2:rgba(255,255,255,.055);
   --border:rgba(255,255,255,.08);
   --border2:rgba(255,255,255,.14);
   --grad:linear-gradient(135deg,#4f7cff,#8b5cf6);
@@ -24,6 +25,7 @@
   --code-bg:#0d1117;
   --green:#3ecf8e;
   --red:#ef5a6f;
+  --blue:#4f7cff;
 }
 
 *{
@@ -50,6 +52,10 @@ textarea{
   font-family:inherit;
 }
 
+button{
+  -webkit-tap-highlight-color:transparent;
+}
+
 ::-webkit-scrollbar{
   width:6px;
   height:6px;
@@ -65,7 +71,9 @@ textarea{
   height:100dvh;
 }
 
-/* ================= SIDEBAR ================= */
+/* =========================================================
+   SIDEBAR
+========================================================= */
 
 .sidebar{
   width:270px;
@@ -143,10 +151,21 @@ textarea{
 }
 
 .chat-item{
-  padding:9px 10px;
-  border-radius:8px;
+  padding:10px;
+  border-radius:9px;
   font-size:.82rem;
   color:var(--muted);
+  background:rgba(255,255,255,.025);
+  border:1px solid transparent;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.chat-item.active{
+  color:var(--text);
+  border-color:var(--border);
+  background:rgba(255,255,255,.045);
 }
 
 .sidebar-footer{
@@ -168,7 +187,9 @@ textarea{
   color:var(--muted);
 }
 
-/* ================= MAIN ================= */
+/* =========================================================
+   MAIN
+========================================================= */
 
 .main{
   flex:1;
@@ -198,6 +219,7 @@ textarea{
   padding:12px 20px;
   border-bottom:1px solid var(--border);
   flex-shrink:0;
+  backdrop-filter:blur(14px);
 }
 
 .menu-btn{
@@ -220,6 +242,11 @@ textarea{
   font-size:.8rem;
   cursor:pointer;
   color:var(--text);
+  user-select:none;
+}
+
+.mode-select:hover{
+  border-color:var(--border2);
 }
 
 .mode-dot{
@@ -227,6 +254,7 @@ textarea{
   height:7px;
   border-radius:50%;
   background:var(--green);
+  box-shadow:0 0 10px rgba(62,207,142,.5);
 }
 
 .model-badge{
@@ -237,35 +265,38 @@ textarea{
   border-radius:20px;
 }
 
-/* ================= CHAT ================= */
+/* =========================================================
+   CHAT
+========================================================= */
 
 .chat-scroll{
   flex:1;
   overflow-y:auto;
   padding:26px 18px;
-  scroll-behavior:smooth;
+  scroll-behavior:auto;
 }
 
 .wrap{
-  max-width:760px;
+  max-width:820px;
   margin:0 auto;
 }
 
 .hero{
   text-align:center;
-  padding:40px 10px 26px;
+  padding:42px 10px 26px;
 }
 
 .hero-icon{
-  width:56px;
-  height:56px;
-  border-radius:16px;
+  width:58px;
+  height:58px;
+  border-radius:17px;
   background:var(--grad);
   margin:0 auto 18px;
   display:flex;
   align-items:center;
   justify-content:center;
   overflow:hidden;
+  box-shadow:0 10px 35px rgba(79,124,255,.18);
 }
 
 .hero-icon img{
@@ -308,10 +339,16 @@ textarea{
   padding:15px;
   cursor:pointer;
   text-align:right;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease;
 }
 
 .sugg-card:hover{
   border-color:rgba(79,124,255,.4);
+  background:var(--panel2);
+  transform:translateY(-2px);
 }
 
 .sugg-card .t{
@@ -325,13 +362,28 @@ textarea{
   color:var(--muted2);
 }
 
-/* ================= MESSAGES ================= */
+/* =========================================================
+   MESSAGES
+========================================================= */
 
 .msg{
   display:flex;
   gap:12px;
-  margin-bottom:22px;
+  margin-bottom:25px;
   align-items:flex-start;
+  animation:messageIn .18s ease;
+}
+
+@keyframes messageIn{
+  from{
+    opacity:0;
+    transform:translateY(5px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
 }
 
 .msg.user{
@@ -339,8 +391,8 @@ textarea{
 }
 
 .avatar{
-  width:30px;
-  height:30px;
+  width:31px;
+  height:31px;
   border-radius:9px;
   flex-shrink:0;
   display:flex;
@@ -355,6 +407,7 @@ textarea{
   color:#fff;
   font-family:'JetBrains Mono';
   overflow:hidden;
+  box-shadow:0 4px 15px rgba(79,124,255,.18);
 }
 
 .avatar.ai img{
@@ -381,7 +434,9 @@ textarea{
   padding:11px 15px;
   font-size:.88rem;
   width:fit-content;
-  max-width:min(650px,100%);
+  max-width:min(680px,100%);
+  white-space:pre-wrap;
+  line-height:1.8;
 }
 
 .msg.ai .bubble{
@@ -394,7 +449,30 @@ textarea{
   overflow-wrap:anywhere;
 }
 
-/* ================= CODE ================= */
+.typing-cursor{
+  display:inline-block;
+  width:7px;
+  height:18px;
+  margin-right:3px;
+  vertical-align:-3px;
+  background:#8993a8;
+  border-radius:2px;
+  animation:blink .8s infinite;
+}
+
+@keyframes blink{
+  0%,45%{
+    opacity:1;
+  }
+
+  46%,100%{
+    opacity:0;
+  }
+}
+
+/* =========================================================
+   CODE
+========================================================= */
 
 .code-block{
   background:var(--code-bg);
@@ -432,6 +510,10 @@ textarea{
   font-family:'Cairo';
 }
 
+.code-actions button:hover{
+  background:rgba(255,255,255,.05);
+}
+
 .code-body{
   padding:12px 16px;
   font-family:'JetBrains Mono',monospace;
@@ -441,6 +523,7 @@ textarea{
   text-align:left;
   color:#d4d4d4;
   white-space:pre-wrap;
+  direction:ltr;
 }
 
 .inline-code{
@@ -451,6 +534,7 @@ textarea{
   font-family:'JetBrains Mono',monospace;
   font-size:.85em;
   color:#a9bdff;
+  direction:ltr;
 }
 
 .ai-text strong{
@@ -479,12 +563,92 @@ textarea{
   color:#b5cea8;
 }
 
-/* ================= MESSAGE ACTIONS ================= */
+/* =========================================================
+   PROJECT CARD
+========================================================= */
+
+.project-card{
+  margin-top:15px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.025);
+  border-radius:14px;
+  overflow:hidden;
+}
+
+.project-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:11px 13px;
+  border-bottom:1px solid var(--border);
+}
+
+.project-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+  font-size:.84rem;
+}
+
+.project-status{
+  font-size:.7rem;
+  color:var(--green);
+}
+
+.project-files{
+  padding:8px;
+}
+
+.project-file{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 9px;
+  color:var(--muted);
+  font-family:'JetBrains Mono';
+  font-size:.72rem;
+  border-radius:7px;
+}
+
+.project-file:hover{
+  background:var(--panel);
+  color:var(--text);
+}
+
+.project-actions{
+  display:flex;
+  gap:8px;
+  padding:10px;
+  border-top:1px solid var(--border);
+}
+
+.project-btn{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+  border-radius:8px;
+  padding:7px 11px;
+  cursor:pointer;
+  font-size:.72rem;
+}
+
+.project-btn.primary{
+  background:var(--grad);
+  border:none;
+  color:#fff;
+}
+
+/* =========================================================
+   MESSAGE ACTIONS
+========================================================= */
 
 .msg-actions{
   display:flex;
   gap:4px;
   margin-top:8px;
+  flex-wrap:wrap;
 }
 
 .msg-actions button{
@@ -503,7 +667,9 @@ textarea{
   color:var(--text);
 }
 
-/* ================= INPUT ================= */
+/* =========================================================
+   INPUT
+========================================================= */
 
 .input-zone{
   padding:14px 18px 18px;
@@ -511,13 +677,15 @@ textarea{
 }
 
 .input-box{
-  max-width:760px;
+  max-width:820px;
   margin:0 auto;
-  background:var(--panel);
+  background:rgba(20,25,36,.78);
   border:1px solid var(--border2);
   border-radius:18px;
   padding:12px 14px;
-  backdrop-filter:blur(10px);
+  backdrop-filter:blur(14px);
+  position:relative;
+  box-shadow:0 10px 35px rgba(0,0,0,.12);
 }
 
 .input-box textarea{
@@ -610,7 +778,66 @@ textarea{
   min-height:1px;
 }
 
-/* ================= SIDEBAR OVERLAY ================= */
+/* =========================================================
+   EMOJI PICKER
+========================================================= */
+
+.emoji-picker{
+  position:absolute;
+  right:12px;
+  bottom:74px;
+  width:280px;
+  max-height:250px;
+  overflow-y:auto;
+  background:#111722;
+  border:1px solid var(--border2);
+  border-radius:14px;
+  padding:10px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+  display:none;
+  z-index:50;
+}
+
+.emoji-picker.show{
+  display:block;
+  animation:pickerIn .15s ease;
+}
+
+@keyframes pickerIn{
+  from{
+    opacity:0;
+    transform:translateY(5px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.emoji-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+}
+
+.emoji-item{
+  border:none;
+  background:transparent;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:1.25rem;
+  width:34px;
+  height:34px;
+}
+
+.emoji-item:hover{
+  background:rgba(255,255,255,.08);
+}
+
+/* =========================================================
+   SIDEBAR OVERLAY
+========================================================= */
 
 .overlay{
   display:none;
@@ -620,7 +847,9 @@ textarea{
   z-index:20;
 }
 
-/* ================= RESPONSIVE ================= */
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 
 @media (max-width:860px){
 
@@ -664,6 +893,44 @@ textarea{
   .input-zone{
     padding:10px 10px 14px;
   }
+
+  .emoji-picker{
+    right:5px;
+    bottom:72px;
+    width:270px;
+  }
+
+  .hero{
+    padding-top:25px;
+  }
+}
+
+@media (max-width:520px){
+
+  .msg{
+    gap:8px;
+  }
+
+  .avatar{
+    width:28px;
+    height:28px;
+  }
+
+  .msg.ai .bubble{
+    font-size:.9rem;
+  }
+
+  .msg.user .bubble{
+    font-size:.84rem;
+  }
+
+  .code-body{
+    font-size:.78rem;
+  }
+
+  .hero h1{
+    font-size:1.45rem;
+  }
 }
 </style>
 </head>
@@ -674,8 +941,7 @@ textarea{
 
   <div
     class="overlay"
-    id="overlay"
-    onclick="toggleSidebar()">
+    id="overlay">
   </div>
 
   <aside class="sidebar" id="sidebar">
@@ -697,16 +963,18 @@ textarea{
       class="new-chat"
       id="newChatBtn"
       type="button">
-      + &nbsp; محادثة جديدة
+      ＋ &nbsp; محادثة جديدة
     </button>
 
     <div>
 
       <div class="side-label">
-        CodeMind AI
+        المحادثات
       </div>
 
-      <div class="chat-item">
+      <div
+        class="chat-item active"
+        id="currentChatTitle">
         محادثة حالية
       </div>
 
@@ -733,7 +1001,8 @@ textarea{
       <button
         class="menu-btn"
         id="menuBtn"
-        type="button">
+        type="button"
+        aria-label="فتح القائمة">
         ☰
       </button>
 
@@ -837,6 +1106,14 @@ textarea{
 
       <div class="input-box">
 
+        <div
+          class="emoji-picker"
+          id="emojiPicker">
+
+          <div class="emoji-grid" id="emojiGrid"></div>
+
+        </div>
+
         <textarea
           rows="1"
           id="ta"
@@ -850,13 +1127,20 @@ textarea{
 
             <button
               class="tool-btn"
+              id="emojiBtn"
+              type="button"
+              title="إضافة Emoji"
+              aria-label="إضافة Emoji">
+              😊
+            </button>
+
+            <button
+              class="tool-btn"
               id="micBtn"
               type="button"
               title="التحدث إلى CodeMind AI"
               aria-label="التحدث إلى CodeMind AI">
-
               🎙️
-
             </button>
 
           </div>
@@ -866,9 +1150,7 @@ textarea{
             id="sendBtn"
             type="button"
             aria-label="إرسال">
-
             ➤
-
           </button>
 
         </div>
@@ -886,13 +1168,12 @@ textarea{
 </div>
 
 <script>
-
 /* =========================================================
-   MEMORY SETTINGS
+   MEMORY
 ========================================================= */
 
 const MEMORY_KEY =
-  'codemind_conversation_history_v1';
+  'codemind_conversation_history_v2';
 
 const MAX_HISTORY_MESSAGES = 30;
 const MAX_HISTORY_CHARS = 24000;
@@ -910,6 +1191,15 @@ const sendBtn =
 
 const micBtn =
   document.getElementById('micBtn');
+
+const emojiBtn =
+  document.getElementById('emojiBtn');
+
+const emojiPicker =
+  document.getElementById('emojiPicker');
+
+const emojiGrid =
+  document.getElementById('emojiGrid');
 
 const messagesContainer =
   document.getElementById('messagesContainer');
@@ -929,6 +1219,12 @@ const modeSelect =
 const modeLabel =
   document.getElementById('modeLabel');
 
+const sidebar =
+  document.getElementById('sidebar');
+
+const overlay =
+  document.getElementById('overlay');
+
 
 /* =========================================================
    SIDEBAR
@@ -936,16 +1232,15 @@ const modeLabel =
 
 function toggleSidebar(){
 
-  const sidebar =
-    document.getElementById('sidebar');
-
-  const overlay =
-    document.getElementById('overlay');
-
   sidebar.classList.toggle('open');
-
   overlay.classList.toggle('show');
+
 }
+
+overlay.addEventListener(
+  'click',
+  toggleSidebar
+);
 
 
 /* =========================================================
@@ -1005,13 +1300,14 @@ function loadConversationHistory(){
   }catch(error){
 
     console.error(
-      'Conversation memory load error:',
+      'Memory load error:',
       error
     );
 
     conversationHistory = [];
 
   }
+
 }
 
 
@@ -1035,11 +1331,12 @@ function saveConversationHistory(){
   }catch(error){
 
     console.error(
-      'Conversation memory save error:',
+      'Memory save error:',
       error
     );
 
   }
+
 }
 
 
@@ -1060,16 +1357,17 @@ function clearConversationHistory(){
   }catch(error){
 
     console.error(
-      'Conversation memory clear error:',
+      'Memory clear error:',
       error
     );
 
   }
+
 }
 
 
 /* =========================================================
-   GET AI CONTEXT
+   CONTEXT FOR BACKEND
 ========================================================= */
 
 function getContextHistory(){
@@ -1135,6 +1433,7 @@ function getContextHistory(){
   }
 
   return result.reverse();
+
 }
 
 
@@ -1167,32 +1466,49 @@ function escapeHtml(text){
 
 
 /* =========================================================
-   CODE HIGHLIGHT
+   SAFE CODE HIGHLIGHT
 ========================================================= */
 
 function syntaxHighlight(code){
 
-  return escapeHtml(code)
+  const escaped =
+    escapeHtml(code);
 
-    .replace(
-      /(".*?"|'.*?'|`.*?`)/g,
-      '<span class="tk-str">$1</span>'
-    )
+  const tokenRegex =
+    /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\n]*|\b(?:function|const|let|var|return|if|else|for|while|class|import|export|from|async|await|new|try|catch|throw)\b|\b\d+(?:\.\d+)?\b)/g;
 
-    .replace(
-      /\b(function|const|let|var|return|if|else|for|while|class|import|export|from|async|await)\b/g,
-      '<span class="tk-kw">$1</span>'
-    )
+  return escaped.replace(
+    tokenRegex,
+    function(token){
 
-    .replace(
-      /(\/\/.*)/g,
-      '<span class="tk-com">$1</span>'
-    )
+      if(
+        /^\/\//.test(token)
+      ){
 
-    .replace(
-      /\b(\d+)\b/g,
-      '<span class="tk-num">$1</span>'
-    );
+        return `<span class="tk-com">${token}</span>`;
+
+      }
+
+      if(
+        /^["'`]/.test(token)
+      ){
+
+        return `<span class="tk-str">${token}</span>`;
+
+      }
+
+      if(
+        /^\d/.test(token)
+      ){
+
+        return `<span class="tk-num">${token}</span>`;
+
+      }
+
+      return `<span class="tk-kw">${token}</span>`;
+
+    }
+  );
 
 }
 
@@ -1203,55 +1519,38 @@ function syntaxHighlight(code){
 
 function parseMarkdown(text){
 
-  let html =
-    escapeHtml(text);
+  let source =
+    String(text || '');
 
-  html =
-    html.replace(
-      /```([\w+-]+)?\n?([\s\S]*?)```/g,
+  const codeBlocks = [];
+
+  source =
+    source.replace(
+      /```([\w+-]*)\n?([\s\S]*?)```/g,
       function(match,lang,code){
 
-        const cleanCode =
-          code.replace(
-            /^\n|\n$/g,
-            ''
-          );
+        const index =
+          codeBlocks.length;
 
-        const encoded =
-          encodeURIComponent(cleanCode);
+        codeBlocks.push({
 
-        return `
-          <div class="code-block">
+          lang:
+            lang || 'code',
 
-            <div class="code-head">
+          code:
+            code
+              .replace(/^\n/,'')
+              .replace(/\n$/,'')
 
-              <span class="code-lang">
-                ${lang || 'code'}
-              </span>
+        });
 
-              <div class="code-actions">
-
-                <button
-                  type="button"
-                  onclick="copyText(this,'${encoded}')">
-
-                  📋 نسخ الكود
-
-                </button>
-
-              </div>
-
-            </div>
-
-            <div class="code-body">
-              ${syntaxHighlight(cleanCode)}
-            </div>
-
-          </div>
-        `;
+        return `@@CODEBLOCK_${index}@@`;
 
       }
     );
+
+  let html =
+    escapeHtml(source);
 
   html =
     html.replace(
@@ -1271,33 +1570,105 @@ function parseMarkdown(text){
       '<br>'
     );
 
+  html =
+    html.replace(
+      /@@CODEBLOCK_(\d+)@@/g,
+      function(match,index){
+
+        const block =
+          codeBlocks[
+            Number(index)
+          ];
+
+        if(!block){
+          return '';
+        }
+
+        const encoded =
+          encodeURIComponent(
+            block.code
+          );
+
+        return `
+          <div class="code-block">
+
+            <div class="code-head">
+
+              <span class="code-lang">
+                ${escapeHtml(block.lang)}
+              </span>
+
+              <div class="code-actions">
+
+                <button
+                  type="button"
+                  data-copy-code="${encoded}"
+                  onclick="copyCodeFromButton(this)">
+                  📋 نسخ الكود
+                </button>
+
+              </div>
+
+            </div>
+
+            <div class="code-body">
+              ${syntaxHighlight(block.code)}
+            </div>
+
+          </div>
+        `;
+
+      }
+    );
+
   return html;
+
 }
 
 
 /* =========================================================
-   COPY
+   COPY CODE
 ========================================================= */
 
-async function copyText(btn,encoded){
+async function copyCodeFromButton(button){
+
+  const encoded =
+    button.dataset.copyCode || '';
+
+  await copyText(
+    button,
+    encoded
+  );
+
+}
+
+
+/* =========================================================
+   COPY TEXT
+========================================================= */
+
+async function copyText(button,encoded){
 
   try{
 
     const text =
       decodeURIComponent(encoded);
 
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(
+      text
+    );
 
-    const old =
-      btn.innerHTML;
+    const oldText =
+      button.innerHTML;
 
-    btn.innerHTML =
+    button.innerHTML =
       '✅ تم النسخ';
 
     setTimeout(
       function(){
 
-        btn.innerHTML = old;
+        button.innerHTML =
+          oldText;
 
       },
       1800
@@ -1309,16 +1680,17 @@ async function copyText(btn,encoded){
       '⚠️ لم يتمكن المتصفح من نسخ النص.';
 
   }
+
 }
 
 
 /* =========================================================
-   TEXT TO SPEECH
+   SPEECH
 ========================================================= */
 
 let activeSpeech = null;
 
-function speakText(btn,encoded){
+function speakText(button,encoded){
 
   if(
     !('speechSynthesis' in window)
@@ -1328,18 +1700,20 @@ function speakText(btn,encoded){
       '⚠️ المتصفح لا يدعم قراءة النصوص صوتيًا.';
 
     return;
+
   }
 
   window.speechSynthesis.cancel();
 
-  if(activeSpeech === btn){
+  if(activeSpeech === button){
 
     activeSpeech = null;
 
-    btn.textContent =
+    button.textContent =
       '🔊 استماع';
 
     return;
+
   }
 
   const text =
@@ -1354,30 +1728,32 @@ function speakText(btn,encoded){
       : 'en-US';
 
   utterance.rate =
-    0.95;
+    .95;
 
   utterance.onend =
     function(){
 
-      if(activeSpeech === btn){
+      if(activeSpeech === button){
 
         activeSpeech = null;
 
-        btn.textContent =
+        button.textContent =
           '🔊 استماع';
 
       }
 
     };
 
-  activeSpeech = btn;
+  activeSpeech =
+    button;
 
-  btn.textContent =
+  button.textContent =
     '⏹ إيقاف';
 
   window.speechSynthesis.speak(
     utterance
   );
+
 }
 
 
@@ -1430,13 +1806,15 @@ if(SpeechRecognition){
     function(event){
 
       const transcript =
-        Array.from(event.results)
-          .map(function(result){
+        Array.from(
+          event.results
+        )
+        .map(function(result){
 
-            return result[0].transcript;
+          return result[0].transcript;
 
-          })
-          .join('');
+        })
+        .join('');
 
       ta.value =
         speechPrefix + transcript;
@@ -1508,12 +1886,13 @@ if(SpeechRecognition){
 
 
 /* =========================================================
-   TEXTAREA RESIZE
+   TEXTAREA
 ========================================================= */
 
 function resizeTextarea(){
 
-  ta.style.height = 'auto';
+  ta.style.height =
+    'auto';
 
   ta.style.height =
     Math.min(
@@ -1530,7 +1909,139 @@ ta.addEventListener(
 
 
 /* =========================================================
-   AI MODES
+   EMOJI
+========================================================= */
+
+const EMOJIS = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣',
+  '😊','😇','🙂','🙃','😉','😌','😍','🥰',
+  '😘','😎','🤩','🥳','😏','🤔','🫡','😐',
+  '😶','🙄','😮','😯','😲','😳','🥹','😭',
+  '😢','😡','🤬','😱','😴','🤯','🤗','🫠',
+  '👍','👎','👏','🙌','🔥','❤️','🧡','💛',
+  '💚','💙','💜','🖤','🤍','💯','✨','⭐',
+  '🚀','💻','🖥️','📱','⌨️','🖱️','🧠','🤖',
+  '👨‍💻','👩‍💻','⚡','🛠️','📦','📁','📂','🔐',
+  '🌐','🐛','✅','❌','⚠️','🎯','💡','🎉'
+];
+
+function buildEmojiPicker(){
+
+  emojiGrid.innerHTML = '';
+
+  EMOJIS.forEach(
+    function(emoji){
+
+      const button =
+        document.createElement('button');
+
+      button.type =
+        'button';
+
+      button.className =
+        'emoji-item';
+
+      button.textContent =
+        emoji;
+
+      button.addEventListener(
+        'click',
+        function(){
+
+          insertEmoji(emoji);
+
+        }
+      );
+
+      emojiGrid.appendChild(
+        button
+      );
+
+    }
+  );
+
+}
+
+function insertEmoji(emoji){
+
+  const start =
+    ta.selectionStart;
+
+  const end =
+    ta.selectionEnd;
+
+  const before =
+    ta.value.substring(
+      0,
+      start
+    );
+
+  const after =
+    ta.value.substring(
+      end
+    );
+
+  ta.value =
+    before +
+    emoji +
+    after;
+
+  const cursor =
+    start +
+    emoji.length;
+
+  ta.selectionStart =
+    cursor;
+
+  ta.selectionEnd =
+    cursor;
+
+  resizeTextarea();
+
+  ta.focus();
+
+  emojiPicker.classList.remove(
+    'show'
+  );
+
+}
+
+emojiBtn.addEventListener(
+  'click',
+  function(event){
+
+    event.stopPropagation();
+
+    emojiPicker.classList.toggle(
+      'show'
+    );
+
+  }
+);
+
+document.addEventListener(
+  'click',
+  function(event){
+
+    if(
+      !emojiPicker.contains(event.target) &&
+      event.target !== emojiBtn
+    ){
+
+      emojiPicker.classList.remove(
+        'show'
+      );
+
+    }
+
+  }
+);
+
+buildEmojiPicker();
+
+
+/* =========================================================
+   MODES
 ========================================================= */
 
 const MODES = {
@@ -1558,11 +2069,14 @@ modeSelect.addEventListener(
       Object.keys(MODES);
 
     const index =
-      keys.indexOf(currentMode);
+      keys.indexOf(
+        currentMode
+      );
 
     currentMode =
       keys[
-        (index + 1) % keys.length
+        (index + 1) %
+        keys.length
       ];
 
     modeLabel.textContent =
@@ -1584,21 +2098,71 @@ function addUserMessage(text){
   message.className =
     'msg user';
 
-  message.innerHTML = `
+  const avatar =
+    document.createElement('div');
 
-    <div class="avatar user">
-      أ
-    </div>
+  avatar.className =
+    'avatar user';
 
-    <div class="bubble">
-      ${escapeHtml(text)}
-    </div>
+  avatar.textContent =
+    'أ';
 
-  `;
+  const bubble =
+    document.createElement('div');
+
+  bubble.className =
+    'bubble';
+
+  bubble.textContent =
+    text;
+
+  message.appendChild(
+    avatar
+  );
+
+  message.appendChild(
+    bubble
+  );
 
   messagesContainer.appendChild(
     message
   );
+
+}
+
+
+/* =========================================================
+   ADD AI MESSAGE
+========================================================= */
+
+function createAiMessageElement(){
+
+  const message =
+    document.createElement('div');
+
+  message.className =
+    'msg ai';
+
+  message.innerHTML = `
+
+    <div class="avatar ai">
+
+      <img
+        src="/logo.png"
+        alt="CodeMind AI">
+
+    </div>
+
+    <div class="bubble">
+
+      <div class="ai-text"></div>
+
+    </div>
+
+  `;
+
+  return message;
+
 }
 
 
@@ -1609,213 +2173,397 @@ function addUserMessage(text){
 function addAiMessage(text){
 
   const message =
-    document.createElement('div');
+    createAiMessageElement();
 
-  message.className =
-    'msg ai';
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
 
-  const encoded =
-    encodeURIComponent(text);
+  textElement.innerHTML =
+    parseMarkdown(text);
 
-  message.innerHTML = `
-
-    <div class="avatar ai">
-
-      <img
-        src="/logo.png"
-        alt="CodeMind AI">
-
-    </div>
-
-    <div class="bubble">
-
-      <div class="ai-text">
-        ${parseMarkdown(text)}
-      </div>
-
-      <div class="msg-actions">
-
-        <button
-          type="button"
-          onclick="speakText(this,'${encoded}')">
-
-          🔊 استماع
-
-        </button>
-
-        <button
-          type="button"
-          onclick="copyText(this,'${encoded}')">
-
-          📋 نسخ الرد
-
-        </button>
-
-      </div>
-
-    </div>
-
-  `;
+  addMessageActions(
+    message,
+    text
+  );
 
   messagesContainer.appendChild(
     message
   );
+
 }
 
 
 /* =========================================================
-   LOAD SAVED MESSAGES INTO UI
+   MESSAGE ACTIONS
 ========================================================= */
 
-function renderSavedConversation(){
+function addMessageActions(
+  message,
+  text
+){
 
-  messagesContainer.innerHTML = '';
+  const existing =
+    message.querySelector(
+      '.msg-actions'
+    );
 
-  if(
-    conversationHistory.length === 0
-  ){
-
-    heroSection.style.display = '';
-
-    return;
+  if(existing){
+    existing.remove();
   }
 
-  heroSection.style.display =
-    'none';
+  const encoded =
+    encodeURIComponent(text);
 
-  conversationHistory.forEach(
-    function(item){
+  const actions =
+    document.createElement('div');
 
-      if(item.role === 'user'){
+  actions.className =
+    'msg-actions';
 
-        addUserMessage(
-          item.content
-        );
+  const speakButton =
+    document.createElement('button');
 
-      }else if(
-        item.role === 'assistant'
-      ){
+  speakButton.type =
+    'button';
 
-        addAiMessage(
-          item.content
-        );
+  speakButton.textContent =
+    '🔊 استماع';
 
-      }
+  speakButton.addEventListener(
+    'click',
+    function(){
+
+      speakText(
+        speakButton,
+        encoded
+      );
 
     }
   );
 
-  scrollToBottom();
+  const copyButton =
+    document.createElement('button');
+
+  copyButton.type =
+    'button';
+
+  copyButton.textContent =
+    '📋 نسخ الرد';
+
+  copyButton.addEventListener(
+    'click',
+    function(){
+
+      copyText(
+        copyButton,
+        encoded
+      );
+
+    }
+  );
+
+  actions.appendChild(
+    speakButton
+  );
+
+  actions.appendChild(
+    copyButton
+  );
+
+  message
+    .querySelector('.bubble')
+    .appendChild(actions);
+
 }
 
 
 /* =========================================================
-   AI LOADING
+   PROJECT UI
+========================================================= */
+
+function addProjectCard(
+  message,
+  project
+){
+
+  if(
+    !project ||
+    !Array.isArray(project.files)
+  ){
+
+    return;
+
+  }
+
+  const card =
+    document.createElement('div');
+
+  card.className =
+    'project-card';
+
+  const projectName =
+    project.name ||
+    'مشروع CodeMind';
+
+  const files =
+    project.files;
+
+  const zipUrl =
+    project.zipUrl ||
+    project.downloadUrl ||
+    '';
+
+  let filesHtml = '';
+
+  files
+    .slice(0,30)
+    .forEach(
+      function(file){
+
+        const name =
+          typeof file === 'string'
+            ? file
+            : file.name;
+
+        if(!name){
+          return;
+        }
+
+        filesHtml += `
+          <div class="project-file">
+            📄 ${escapeHtml(name)}
+          </div>
+        `;
+
+      }
+    );
+
+  card.innerHTML = `
+
+    <div class="project-head">
+
+      <div class="project-title">
+        📦 ${escapeHtml(projectName)}
+      </div>
+
+      <div class="project-status">
+        ${zipUrl ? 'جاهز' : 'قيد التجهيز'}
+      </div>
+
+    </div>
+
+    <div class="project-files">
+      ${filesHtml || `
+        <div class="project-file">
+          📁 سيتم عرض ملفات المشروع هنا
+        </div>
+      `}
+    </div>
+
+    <div class="project-actions">
+
+      ${
+        zipUrl
+          ? `
+            <a
+              class="project-btn primary"
+              href="${escapeHtml(zipUrl)}"
+              download>
+              ⬇️ تحميل المشروع ZIP
+            </a>
+          `
+          : `
+            <button
+              class="project-btn"
+              type="button"
+              disabled>
+              ⏳ تجهيز ZIP...
+            </button>
+          `
+      }
+
+    </div>
+  `;
+
+  message
+    .querySelector('.bubble')
+    .appendChild(card);
+
+}
+
+
+/* =========================================================
+   LOADING
 ========================================================= */
 
 function addAiLoading(){
 
   const message =
-    document.createElement('div');
-
-  message.className =
-    'msg ai';
+    createAiMessageElement();
 
   message.id =
     'loadingMessage';
 
-  message.innerHTML = `
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
 
-    <div class="avatar ai">
-
-      <img
-        src="/logo.png"
-        alt="CodeMind AI">
-
-    </div>
-
-    <div class="bubble">
-
-      <div class="ai-text">
-        جاري التفكير...
-      </div>
-
-    </div>
-
+  textElement.innerHTML = `
+    جاري التفكير
+    <span class="typing-cursor"></span>
   `;
 
   messagesContainer.appendChild(
     message
   );
 
-  scrollToBottom();
 }
 
 
 /* =========================================================
-   AI RESPONSE
+   TYPING RESPONSE
 ========================================================= */
 
-function showAiResponse(text){
+async function typeAiResponse(
+  message,
+  text
+){
+
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
+
+  if(!textElement){
+    return;
+  }
+
+  /*
+    نعرض الرد تدريجيًا.
+    السرعة تتغير حسب طول النص.
+  */
+
+  let visibleText = '';
+
+  const length =
+    text.length;
+
+  let index = 0;
+
+  while(index < length){
+
+    let chunkSize = 2;
+
+    if(length < 300){
+
+      chunkSize = 2;
+
+    }else if(length < 1000){
+
+      chunkSize = 4;
+
+    }else{
+
+      chunkSize = 6;
+
+    }
+
+    const chunk =
+      text.slice(
+        index,
+        index + chunkSize
+      );
+
+    visibleText +=
+      chunk;
+
+    index +=
+      chunkSize;
+
+    textElement.innerHTML =
+      parseMarkdown(
+        visibleText
+      ) +
+      '<span class="typing-cursor"></span>';
+
+    /*
+      لا نعمل scroll هنا.
+      المستخدم يظل في مكانه.
+    */
+
+    await new Promise(
+      function(resolve){
+
+        setTimeout(
+          resolve,
+          18
+        );
+
+      }
+    );
+
+  }
+
+  textElement.innerHTML =
+    parseMarkdown(text);
+
+  addMessageActions(
+    message,
+    text
+  );
+
+}
+
+
+/* =========================================================
+   SHOW AI RESPONSE
+========================================================= */
+
+async function showAiResponse(
+  text,
+  project
+){
 
   const loading =
     document.getElementById(
       'loadingMessage'
     );
 
-  if(!loading){
+  let message =
+    loading;
 
-    addAiMessage(text);
+  if(!message){
 
-    return;
+    message =
+      createAiMessageElement();
+
+    messagesContainer.appendChild(
+      message
+    );
+
   }
 
-  const encoded =
-    encodeURIComponent(text);
+  message.removeAttribute(
+    'id'
+  );
 
-  loading.removeAttribute('id');
+  await typeAiResponse(
+    message,
+    text
+  );
 
-  loading.innerHTML = `
+  if(project){
 
-    <div class="avatar ai">
+    addProjectCard(
+      message,
+      project
+    );
 
-      <img
-        src="/logo.png"
-        alt="CodeMind AI">
+  }
 
-    </div>
-
-    <div class="bubble">
-
-      <div class="ai-text">
-        ${parseMarkdown(text)}
-      </div>
-
-      <div class="msg-actions">
-
-        <button
-          type="button"
-          onclick="speakText(this,'${encoded}')">
-
-          🔊 استماع
-
-        </button>
-
-        <button
-          type="button"
-          onclick="copyText(this,'${encoded}')">
-
-          📋 نسخ الرد
-
-        </button>
-
-      </div>
-
-    </div>
-
-  `;
-
-  scrollToBottom();
 }
 
 
@@ -1831,54 +2579,49 @@ function showAiError(message){
     );
 
   if(!loading){
-
     return;
   }
 
-  loading.removeAttribute('id');
+  loading.removeAttribute(
+    'id'
+  );
 
-  loading.innerHTML = `
+  const textElement =
+    loading.querySelector(
+      '.ai-text'
+    );
 
-    <div class="avatar ai">
+  textElement.innerHTML =
+    '⚠️ ' +
+    escapeHtml(message);
 
-      <img
-        src="/logo.png"
-        alt="CodeMind AI">
-
-    </div>
-
-    <div class="bubble">
-
-      <div class="ai-text">
-        ⚠️ ${escapeHtml(message)}
-      </div>
-
-    </div>
-
-  `;
 }
 
 
 /* =========================================================
-   SCROLL
+   NO AUTO SCROLL
 ========================================================= */
 
-function scrollToBottom(){
+/*
+  مهم:
+  لا يوجد هنا scrollToBottom().
+  الشات لن ينزلك تلقائيًا أثناء الرد.
+*/
 
-  setTimeout(
-    function(){
+function isNearBottom(){
 
-      chatScroll.scrollTop =
-        chatScroll.scrollHeight;
+  const distance =
+    chatScroll.scrollHeight -
+    chatScroll.scrollTop -
+    chatScroll.clientHeight;
 
-    },
-    20
-  );
+  return distance < 80;
+
 }
 
 
 /* =========================================================
-   REMOVE LAST USER MESSAGE FROM MEMORY
+   REMOVE LAST USER MESSAGE
 ========================================================= */
 
 function removeLastUserMessage(text){
@@ -1900,10 +2643,13 @@ function removeLastUserMessage(text){
       );
 
       break;
+
     }
+
   }
 
   saveConversationHistory();
+
 }
 
 
@@ -1923,12 +2669,22 @@ async function sendMessage(){
     ta.focus();
 
     return;
+
   }
 
   if(generating){
 
     return;
+
   }
+
+  /*
+    نحفظ مكان المستخدم قبل بدء الرد.
+    ولن نغيره بعد ذلك.
+  */
+
+  const userScrollPosition =
+    chatScroll.scrollTop;
 
   heroSection.style.display =
     'none';
@@ -1936,22 +2692,25 @@ async function sendMessage(){
   statusBanner.textContent =
     '';
 
+  emojiPicker.classList.remove(
+    'show'
+  );
+
   /*
-    نحفظ الـHistory القديمة
-    قبل إضافة الرسالة الحالية.
+    History القديمة فقط.
   */
 
   const historyForRequest =
     getContextHistory();
 
   /*
-    إظهار رسالة المستخدم
+    رسالة المستخدم.
   */
 
   addUserMessage(text);
 
   /*
-    حفظ رسالة المستخدم
+    حفظها.
   */
 
   conversationHistory.push({
@@ -1970,18 +2729,29 @@ async function sendMessage(){
   saveConversationHistory();
 
   /*
-    Loading
+    Loading.
   */
 
   addAiLoading();
 
-  ta.value = '';
+  /*
+    لا نعمل scroll.
+    نرجع نفس المكان.
+  */
+
+  chatScroll.scrollTop =
+    userScrollPosition;
+
+  ta.value =
+    '';
 
   resizeTextarea();
 
-  generating = true;
+  generating =
+    true;
 
-  sendBtn.disabled = true;
+  sendBtn.disabled =
+    true;
 
   sendBtn.textContent =
     '■';
@@ -1992,6 +2762,7 @@ async function sendMessage(){
       await fetch(
         '/api/chat',
         {
+
           method:'POST',
 
           headers:{
@@ -2008,6 +2779,7 @@ async function sendMessage(){
             history:historyForRequest
 
           })
+
         }
       );
 
@@ -2027,15 +2799,19 @@ async function sendMessage(){
         'حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.';
 
       statusBanner.textContent =
-        '⚠️ ' + errorMessage;
+        '⚠️ ' +
+        errorMessage;
 
-      removeLastUserMessage(text);
+      removeLastUserMessage(
+        text
+      );
 
       showAiError(
         errorMessage
       );
 
       return;
+
     }
 
     const reply =
@@ -2049,25 +2825,34 @@ async function sendMessage(){
         'وصل رد فارغ من خدمة الذكاء الاصطناعي.';
 
       statusBanner.textContent =
-        '⚠️ ' + errorMessage;
+        '⚠️ ' +
+        errorMessage;
 
-      removeLastUserMessage(text);
+      removeLastUserMessage(
+        text
+      );
 
       showAiError(
         errorMessage
       );
 
       return;
+
     }
 
     /*
-      عرض الرد
+      Typing effect.
     */
 
-    showAiResponse(reply);
+    await showAiResponse(
+      reply,
+      data.project ||
+      data.generatedProject ||
+      null
+    );
 
     /*
-      حفظ رد الـAI
+      حفظ رد AI.
     */
 
     conversationHistory.push({
@@ -2085,6 +2870,10 @@ async function sendMessage(){
 
     saveConversationHistory();
 
+    /*
+      لا يوجد scroll هنا.
+    */
+
   }catch(error){
 
     console.error(
@@ -2096,9 +2885,12 @@ async function sendMessage(){
       'تعذر الاتصال بالسيرفر. تأكد أن Backend يعمل على Vercel.';
 
     statusBanner.textContent =
-      '⚠️ ' + errorMessage;
+      '⚠️ ' +
+      errorMessage;
 
-    removeLastUserMessage(text);
+    removeLastUserMessage(
+      text
+    );
 
     showAiError(
       errorMessage
@@ -2106,7 +2898,8 @@ async function sendMessage(){
 
   }finally{
 
-    generating = false;
+    generating =
+      false;
 
     sendBtn.disabled =
       false;
@@ -2114,14 +2907,18 @@ async function sendMessage(){
     sendBtn.textContent =
       '➤';
 
-    ta.focus();
+    /*
+      لا نعمل focus إجباري
+      حتى لا تتحرك الشاشة على الموبايل.
+    */
 
   }
+
 }
 
 
 /* =========================================================
-   SEND BUTTON
+   SEND
 ========================================================= */
 
 sendBtn.addEventListener(
@@ -2179,7 +2976,8 @@ document
 
       resizeTextarea();
 
-      ta.focus();
+      chatScroll.scrollTop =
+        0;
 
       if(
         window.innerWidth <= 860
@@ -2194,7 +2992,7 @@ document
 
 
 /* =========================================================
-   SUGGESTION CARDS
+   SUGGESTIONS
 ========================================================= */
 
 document
@@ -2209,7 +3007,8 @@ document
           const text =
             card.dataset.text ||
             card.querySelector('.d')
-              .textContent;
+              .textContent
+              .trim();
 
           ta.value =
             text;
@@ -2226,7 +3025,7 @@ document
 
 
 /* =========================================================
-   MENU BUTTON
+   MENU
 ========================================================= */
 
 document
@@ -2238,6 +3037,69 @@ document
 
 
 /* =========================================================
+   RENDER SAVED CONVERSATION
+========================================================= */
+
+function renderSavedConversation(){
+
+  messagesContainer.innerHTML =
+    '';
+
+  if(
+    conversationHistory.length === 0
+  ){
+
+    heroSection.style.display =
+      '';
+
+    return;
+
+  }
+
+  heroSection.style.display =
+    'none';
+
+  conversationHistory.forEach(
+    function(item){
+
+      if(item.role === 'user'){
+
+        addUserMessage(
+          item.content
+        );
+
+      }
+
+      if(item.role === 'assistant'){
+
+        addAiMessage(
+          item.content
+        );
+
+      }
+
+    }
+  );
+
+  /*
+    عند فتح الصفحة لأول مرة فقط
+    نعرض آخر الرسائل.
+  */
+
+  setTimeout(
+    function(){
+
+      chatScroll.scrollTop =
+        chatScroll.scrollHeight;
+
+    },
+    0
+  );
+
+}
+
+
+/* =========================================================
    INITIALIZE
 ========================================================= */
 
@@ -2246,8 +3108,6 @@ loadConversationHistory();
 renderSavedConversation();
 
 resizeTextarea();
-
-ta.focus();
 
 </script>
 
