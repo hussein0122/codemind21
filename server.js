@@ -51,9 +51,95 @@ app.get('/health', (req, res) => {
   res.json({
     ok: true,
     ai: isAiConfigured(),
-    database: 'disabled'
+    database: 'disabled',
+    memory: 'conversation_context'
   });
 });
+
+/* =========================
+   BUILD SAFE CHAT HISTORY
+========================= */
+
+function buildSafeHistory(history) {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  const allowedRoles = new Set([
+    'user',
+    'assistant'
+  ]);
+
+  const MAX_MESSAGES = 30;
+  const MAX_TOTAL_CHARS = 24000;
+  const MAX_MESSAGE_CHARS = 12000;
+
+  const cleanHistory = [];
+
+  let totalChars = 0;
+
+  /*
+    نبدأ من أحدث الرسائل
+    ونرجع للخلف حتى نصل للحد المسموح.
+  */
+
+  for (
+    let i = history.length - 1;
+    i >= 0 && cleanHistory.length < MAX_MESSAGES;
+    i--
+  ) {
+    const item = history[i];
+
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    if (!allowedRoles.has(item.role)) {
+      continue;
+    }
+
+    if (typeof item.content !== 'string') {
+      continue;
+    }
+
+    const content = item.content.trim();
+
+    if (!content) {
+      continue;
+    }
+
+    const safeContent = content.slice(
+      0,
+      MAX_MESSAGE_CHARS
+    );
+
+    /*
+      لو وصلنا للحد، نوقف إضافة الرسائل القديمة.
+      لكن نسمح دائمًا ببعض الرسائل الحديثة.
+    */
+
+    if (
+      totalChars + safeContent.length > MAX_TOTAL_CHARS &&
+      cleanHistory.length >= 4
+    ) {
+      break;
+    }
+
+    cleanHistory.push({
+      role: item.role,
+      content: safeContent
+    });
+
+    totalChars += safeContent.length;
+  }
+
+  /*
+    لأننا بدأنا من آخر رسالة،
+    نرجع الترتيب الطبيعي للمحادثة.
+  */
+
+  return cleanHistory.reverse();
+}
 
 /* =========================
    DIRECT AI CHAT
@@ -63,8 +149,13 @@ app.post('/api/chat', async (req, res) => {
   try {
     const {
       message,
-      mode = 'code'
+      mode = 'code',
+      history = []
     } = req.body || {};
+
+    /* =========================
+       AI CHECK
+    ========================= */
 
     if (!isAiConfigured()) {
       return res.status(503).json({
@@ -72,6 +163,10 @@ app.post('/api/chat', async (req, res) => {
         message: 'GROQ_API_KEY غير موجود في إعدادات Vercel.'
       });
     }
+
+    /* =========================
+       MESSAGE VALIDATION
+    ========================= */
 
     if (
       typeof message !== 'string' ||
@@ -84,31 +179,68 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    const completion = await createCompletion({
-      messages: [
-        {
-          role: 'user',
-          content: message.trim()
-        }
-      ],
-      mode
-    });
+    /* =========================
+       SAFE HISTORY
+    ========================= */
+
+    const safeHistory =
+      buildSafeHistory(history);
+
+    /*
+      الـAI يحصل الآن على:
+
+      System Prompt
+      +
+      المحادثة السابقة
+      +
+      الرسالة الجديدة
+    */
+
+    const completion =
+      await createCompletion({
+        messages: [
+          ...safeHistory,
+
+          {
+            role: 'user',
+            content: message.trim()
+          }
+        ],
+
+        mode
+      });
+
+    /* =========================
+       AI RESPONSE
+    ========================= */
 
     const reply =
       completion.choices?.[0]?.message?.content || '';
 
+    if (!reply.trim()) {
+      return res.status(502).json({
+        error: 'empty_ai_response',
+        message: 'الذكاء الاصطناعي أرسل ردًا فارغًا.'
+      });
+    }
+
     return res.json({
-      reply
+      reply: reply.trim()
     });
 
   } catch (error) {
-    console.error('AI request failed:', error);
+
+    console.error(
+      'AI request failed:',
+      error
+    );
 
     const isAuthError =
       error.status === 401 ||
       error.code === 'invalid_api_key';
 
     return res.status(502).json({
+
       error: isAuthError
         ? 'invalid_groq_key'
         : 'ai_request_failed',
@@ -121,6 +253,7 @@ app.post('/api/chat', async (req, res) => {
         process.env.NODE_ENV === 'development'
           ? error.message
           : undefined
+
     });
   }
 });
@@ -130,7 +263,11 @@ app.post('/api/chat', async (req, res) => {
 ========================= */
 
 app.use((error, req, res, next) => {
-  console.error('Request failed:', error);
+
+  console.error(
+    'Request failed:',
+    error
+  );
 
   if (res.headersSent) {
     return next(error);
@@ -147,15 +284,23 @@ app.use((error, req, res, next) => {
 ========================= */
 
 if (!process.env.VERCEL) {
+
   app.listen(port, () => {
+
     console.log(
       `CodeMind AI backend running on http://localhost:${port}`
     );
 
     if (!isAiConfigured()) {
-      console.warn('GROQ_API_KEY is missing.');
+
+      console.warn(
+        'GROQ_API_KEY is missing.'
+      );
+
     }
+
   });
+
 }
 
 export default app;
