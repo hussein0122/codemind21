@@ -19,7 +19,5 @@
     "archiver": "^7.0.1",
     "jszip": "^3.10.1"
   },
-  "engines": {
-    "node": "22.x"
-  }
+  "engines": { "node": "22.x" }
 }
