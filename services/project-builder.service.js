@@ -1,0 +1,25 @@
+import { parseProjectResponse } from './project.service.js';
+
+export function isProjectRequest(message, currentProject = null) {
+  if (currentProject) return true;
+  const text = String(message || '').toLowerCase();
+  return [
+    'برمجلي موقع', 'برمج لي موقع', 'اعمللي موقع', 'اعمل لي موقع',
+    'برمجلي تطبيق', 'برمج لي تطبيق', 'اعمللي تطبيق', 'اعمل لي تطبيق',
+    'برمجلي مشروع', 'برمج لي مشروع', 'اعمللي مشروع', 'اعمل لي مشروع',
+    'ابني موقع', 'ابني تطبيق', 'ابني مشروع', 'مشروع كامل', 'ملفات المشروع',
+    'build a website', 'build an app', 'build a project', 'create a website',
+    'create an app', 'create a project', 'full project', 'complete project',
+    'ecommerce', 'متجر الكتروني', 'متجر إلكتروني'
+  ].some((keyword) => text.includes(keyword));
+}
+
+export function buildProjectPrompt(message, currentProject = null) {
+  return `أنت CodeMind AI Project Builder. أعد JSON صالحًا فقط دون Markdown أو <PROJECT>.
+المخطط: {"reply":"تم إنشاء المشروع بنجاح.","project":{"name":"project-name","description":"...","files":[{"path":"index.html","content":"..."}]}}
+أنشئ ملفات كاملة وآمنة، واستخدم .env.example بدل الأسرار. لا تختصر المحتوى ولا تضع المشروع داخل reply.
+${currentProject ? `عدّل المشروع الحالي فقط وحافظ على الملفات غير المطلوبة: ${JSON.stringify(currentProject)}` : 'أنشئ مشروعًا قابلًا للتشغيل.'}
+طلب المستخدم: ${message}`;
+}
+
+export { parseProjectResponse };
