@@ -157,6 +157,8 @@ if (!process.env.VERCEL) {
   initializeAuth().then(() => app.listen(port, () => console.log(`CodeMind AI backend running on http://localhost:${port}`)))
     .catch(error => { console.error('Auth/database initialization failed:', error.message); process.exitCode = 1; });
 } else {
-  initializeAuth().catch(error => console.error('Auth/database initialization failed:', error.message));
+  // Database initialization must never crash the Vercel function during cold start.
+  // Authentication routes report a clear configuration/database error when unavailable.
+  initializeAuth().catch(error => console.error('Auth/database initialization failed:', error?.message || error));
 }
 export default app;
