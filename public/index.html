@@ -2743,8 +2743,12 @@ async function typeAiResponse(
       بعد ذلك لا نعمل auto-scroll أثناء الكتابة.
     */
     if(index === chunkSize){
-      chatScroll.scrollTop =
-        chatScroll.scrollHeight;
+      requestAnimationFrame(function(){
+        chatScroll.scrollTo({
+          top: chatScroll.scrollHeight,
+          behavior: 'smooth'
+        });
+      });
     }
 
     await new Promise(
