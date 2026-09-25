@@ -125,6 +125,19 @@ function setSession(res, user) {
 export function clearSession(res) {
   res.setHeader('Set-Cookie', cookieHeader('', 0));
 }
+export async function optionalAuth(req, res, next) {
+  if (!pool || !secret()) return next();
+  const session = readToken(req.cookies?.[COOKIE_NAME]);
+  if (!session) return next();
+  try {
+    const { rows } = await pool.query('SELECT id,name,email,role FROM users WHERE id = $1', [session.id]);
+    if (rows[0]) req.user = rows[0];
+  } catch (error) {
+    console.error('Optional auth lookup failed:', error?.message || error);
+  }
+  next();
+}
+
 export async function requireAuth(req, res, next) {
   if (!pool) return res.status(503).json({ error: 'database_not_configured', message: 'قاعدة البيانات غير مفعّلة.' });
   if (!secret()) return res.status(503).json({ error: 'auth_not_configured', message: 'إعداد AUTH_SECRET غير موجود.' });
