@@ -1419,7 +1419,7 @@ button{
               title="إضافة مرفق"
               aria-label="إضافة مرفق"
               aria-expanded="false"
-              onclick="return window.CodeMindToggleAttachmentMenu(event)">
+              >
               <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5v14M5 12h14"></path>
               </svg>
@@ -4097,7 +4097,7 @@ window.CodeMindToggleAttachmentMenu = function(event){
   plus.dataset.codemindPlusV2 = '1';
   plus.addEventListener('click', function(event){
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     window.CodeMindToggleAttachmentMenu(event);
   }, true);
 })();
