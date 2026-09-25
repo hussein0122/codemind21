@@ -132,7 +132,10 @@ app.post('/api/transcribe',
   express.raw({
     // The route is already scoped to /api/transcribe; accept the raw body regardless of MIME spelling.
     // This avoids regex escaping issues on Vercel while the client still sends an audio content type.
-    type: () => true,
+    type: (req) => {
+      const contentType = String(req.headers['content-type'] || '').toLowerCase();
+      return contentType.startsWith('audio/') || contentType.startsWith('video/webm');
+    },
     limit: '4mb'
   }),
   async (req, res) => {
