@@ -21,7 +21,7 @@ export async function createCompletion({ messages, mode, structured = false }) {
   const client = createAiClient();
   if (!client) throw new Error('AI_NOT_CONFIGURED');
   const settings = await getAiSettings();
-  const systemPrompt = buildSystemPrompt(mode) + (settings?.concise ? '\\n\\nالتزم بالإيجاز افتراضيًا؛ لا تتجاوز 5 نقاط إلا إذا طلب المستخدم التفصيل.' : '');
+  const systemPrompt = buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا؛ لا تتجاوز 5 نقاط إلا إذا طلب المستخدم التفصيل.' : '');
   const request = {
     model: settings?.model || process.env.GROQ_MODEL || DEFAULT_MODEL,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
