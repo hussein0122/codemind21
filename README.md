@@ -60,3 +60,20 @@ public/index.html         الواجهة الحالية دون تعديل
 - الواجهة الحالية تهرب النصوص قبل العرض، والخادم لا يعيد تفاصيل أخطاء مزود AI.
 - Helmet وRate Limiting مفعّلان على المسارات.
 - لا تضع المفتاح في Git أو داخل `public/`. المفتاح الذي تم نشره في أي محادثة أو سجل يجب إلغاؤه وتدويره فورًا.
+
+
+## الحسابات وSupabase ولوحة الأدمن
+
+- نفّذ ملف `supabase/schema.sql` من Supabase SQL Editor.
+- أضف متغيرات البيئة في Vercel Project Settings → Environment Variables:
+  - `DATABASE_URL`: اتصال PostgreSQL من Supabase (استخدم connection string المناسب لـ Vercel).
+  - `DB_SSL=true`
+  - `AUTH_SECRET`: قيمة عشوائية طويلة وفريدة، لا تقل عن 32 بايت.
+  - `ADMIN_EMAIL=husseinsead3@gmail.com`
+  - `ADMIN_PASSWORD`: كلمة مرور قوية لا تقل عن 12 حرفًا، تضبطها أنت داخل Vercel.
+- عند تشغيل الخادم، ينشئ النظام حساب الأدمن المحدد إذا لم يكن موجودًا، أو يرفع دوره إلى admin. لا يُكتب السر إلى GitHub.
+- الحسابات تستخدم كلمة مرور مشتقة بـ scrypt وجلسة HttpOnly موقعة. إعدادات AI محمية بدور admin وتُحفظ في جدول `ai_settings`.
+- مسارات الحساب: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`.
+- مسارات إعدادات الأدمن: `GET/PUT /api/admin/ai-settings`.
+- الواجهة تضيف الدخول/إنشاء الحساب من عنصر الحساب الشخصي، ولوحة إعدادات النموذج من عنصر الإعدادات دون إعادة تصميم الصفحة.
+- بعد إضافة المتغيرات، أعد نشر Vercel. لا ترسل `DATABASE_URL` أو `AUTH_SECRET` أو كلمة مرور الأدمن في المحادثة أو تضعها في المستودع.
