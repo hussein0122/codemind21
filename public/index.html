@@ -710,37 +710,24 @@ button{
 
 .input-tools{
   display:flex;
-  justify-content:space-between;
   align-items:center;
+  width:100%;
   margin-top:8px;
   direction:rtl;
+  gap:8px;
 }
 
-.input-tools > .mic-btn-placeholder{
-  display:none;
+.composer-spacer{
+  flex:1 1 auto;
+  min-width:0;
 }
 
-.input-actions{
+.send-actions{
   display:flex;
   align-items:center;
   gap:6px;
-}
-
-.tool-icon{
-  width:20px;
-  height:20px;
-  display:block;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:2;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-
-.tool-btn.recording{
-  color:#ff5b68;
-  background:rgba(255,91,104,.12);
-  border-color:rgba(255,91,104,.35);
+  flex:0 0 auto;
+  direction:ltr;
 }
 
 .input-box.drag-active{
@@ -1300,8 +1287,9 @@ button{
           <input id="fileInput" type="file" multiple hidden>
           <input id="imageInput" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
           <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+        <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
 
-          <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
+        <div class="input-tools">
 
           <div class="input-actions">
 
@@ -1326,8 +1314,10 @@ button{
             </button>
 
           </div>
+          <div class="composer-spacer" aria-hidden="true"></div>
 
-            <button
+          <div class="send-actions">
+          <button
               class="tool-btn"
               id="micBtn"
               type="button"
@@ -1348,6 +1338,10 @@ button{
             ➤
           </button>
 
+          </div>
+
+
+  
         </div>
 
       </div>
@@ -3340,7 +3334,9 @@ async function sendMessage(){
     );
 
     const errorMessage =
-      'تعذر الاتصال بالسيرفر. تأكد أن Backend يعمل على Vercel.';
+      error && error.message
+        ? 'تعذر إرسال الرسالة: ' + error.message
+        : 'تعذر الاتصال بالسيرفر. افتح /health للتأكد من حالة Backend.';
 
     statusBanner.textContent =
       '⚠️ ' +
