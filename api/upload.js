@@ -37,11 +37,26 @@ export default async function upload(req, res) {
   try {
     const chunks = [];
     let total = 0;
-    for await (const chunk of req) {
-      total += chunk.length;
-      if (total > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
-      chunks.push(chunk);
+
+    // Vercel/@vercel/node may expose the raw request body on req.body
+    // instead of leaving the multipart stream readable. Support both forms.
+    if (Buffer.isBuffer(req.body)) {
+      chunks.push(req.body);
+      total = req.body.length;
+    } else if (typeof req.body === 'string') {
+      const raw = Buffer.from(req.body, 'binary');
+      chunks.push(raw);
+      total = raw.length;
+    } else {
+      for await (const chunk of req) {
+        const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        total += part.length;
+        if (total > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
+        chunks.push(part);
+      }
     }
+
+    if (total > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
     const files = parseMultipart(Buffer.concat(chunks), match[1] || match[2]);
     if (!files.length) return res.status(400).json({ error: 'no_files', message: 'لم يتم إرسال أي ملف.' });
     if (files.length > limits.maxFiles) return res.status(413).json({ error: 'too_many_files', message: 'عدد الملفات أكبر من الحد المسموح.' });
