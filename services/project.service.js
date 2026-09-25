@@ -1,5 +1,5 @@
-const MAX_FILES = 60;
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_FILES = 220;
+const MAX_BYTES = 15 * 1024 * 1024;
 
 export function sanitizeProjectName(value) {
   return String(value || 'codemind-project')
