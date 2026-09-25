@@ -7,21 +7,31 @@
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
   let recognition = null, active = false, speaking = false;
+  const voiceHistory = [];
+  let selectedVoice = null;
   const setStatus = text => { if (status) status.textContent = text; };
-  function closePanel() { active=false; speaking=false; try{recognition?.stop()}catch{} try{ synth?.cancel() }catch{} panel.classList.remove('open'); mic.classList.remove('active'); setStatus('جاهز لسماعك'); }
+  function closePanel() { active=false; speaking=false; voiceHistory.length=0; try{recognition?.stop()}catch{} try{ synth?.cancel() }catch{} panel.classList.remove('open'); mic.classList.remove('active'); setStatus('جاهز لسماعك'); }
+  function pickVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = speechSynthesis.getVoices();
+    return voices.find(v => v.lang === 'ar-EG') || voices.find(v => /^ar(-|_)/i.test(v.lang)) || voices[0] || null;
+  }
+  speechSynthesis?.addEventListener?.('voiceschanged', () => { selectedVoice = pickVoice(); });
+  selectedVoice = pickVoice();
+
   function speak(text) {
     if (!synth || !text) return;
     synth.cancel();
     const clean = String(text).replace(/```[\s\S]*?```/g, 'الكود مرفق في المحادثة.');
-    const u = new SpeechSynthesisUtterance(clean); u.lang='ar-EG'; u.rate=1; u.pitch=1; speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
+    const u = new SpeechSynthesisUtterance(clean); u.lang='ar-EG'; u.rate=1; u.pitch=1; if(selectedVoice) u.voice=selectedVoice; speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
     u.onend=()=>{speaking=false;if(active)startListening()}; u.onerror=()=>{speaking=false;if(active)startListening()}; synth.speak(u);
   }
   async function sendVoice(text) {
     setStatus('🧠 بفكر في رد مناسب...');
     try {
-      const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,mode:'code',history:[]})});
+      const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,mode:'code',history:voiceHistory.slice(-20)})});
       const data=await response.json(); if(!response.ok) throw new Error(data.message||'voice_request_failed');
-      const reply=String(data.reply||'').trim(); if(!reply) throw new Error('empty_reply'); speak(reply);
+      const reply=String(data.reply||'').trim(); if(!reply) throw new Error('empty_reply'); voiceHistory.push({role:'user',content:text},{role:'assistant',content:reply}); if(voiceHistory.length>20) voiceHistory.splice(0,voiceHistory.length-20); speak(reply);
     } catch(e) { console.error('Voice request failed:',e); setStatus('حصل خطأ. جرّب تاني.'); setTimeout(()=>{if(active)startListening()},1200); }
   }
   function startListening() {
