@@ -717,6 +717,55 @@ button{
   gap:8px;
 }
 
+.input-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
+  direction:rtl;
+}
+
+.input-actions .tool-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.tool-icon,
+.send-icon{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.mic-btn.recording{
+  color:#ff6b7a;
+  border-color:rgba(239,90,111,.55);
+  background:rgba(239,90,111,.12);
+  animation:micPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes micPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(239,90,111,.18);}
+  50%{box-shadow:0 0 0 6px rgba(239,90,111,0);}
+}
+
+.send-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+
+.send-icon{
+  width:19px;
+  height:19px;
+}
+
 .composer-spacer{
   flex:1 1 auto;
   min-width:0;
@@ -737,7 +786,7 @@ button{
 
 .attachment-menu{
   position:absolute;
-  right:14px;
+  right:12px;
   bottom:62px;
   display:none;
   flex-direction:column;
@@ -756,6 +805,10 @@ button{
 }
 
 .attachment-option{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  width:100%;
   border:1px solid transparent;
   background:transparent;
   color:var(--text);
@@ -1250,13 +1303,42 @@ button{
 
       <div class="input-box">
 
-        <div
-          class="emoji-picker"
-          id="emojiPicker">
-
+        <div class="emoji-picker" id="emojiPicker">
           <div class="emoji-grid" id="emojiGrid"></div>
-
         </div>
+
+        <div class="attachment-menu" id="attachmentMenu">
+          <button class="attachment-option" id="chooseFileBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <path d="M14 2v6h6"></path>
+            </svg>
+            <span>رفع ملف</span>
+          </button>
+
+          <button class="attachment-option" id="chooseImageBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <path d="m21 15-5-5L5 21"></path>
+            </svg>
+            <span>رفع صورة</span>
+          </button>
+
+          <button class="attachment-option" id="cameraBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path>
+              <circle cx="12" cy="13" r="3"></circle>
+            </svg>
+            <span>الكاميرا</span>
+          </button>
+        </div>
+
+        <input id="fileInput" type="file" multiple hidden>
+        <input id="imageInput" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+
+        <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
 
         <textarea
           rows="1"
@@ -1267,32 +1349,7 @@ button{
 
         <div class="input-tools">
 
-          <div
-            class="attachment-menu"
-            id="attachmentMenu">
-            <button class="attachment-option" id="chooseFileBtn" type="button">
-              <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>
-              رفع ملف
-            </button>
-            <button class="attachment-option" id="chooseImageBtn" type="button">
-              <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg>
-              رفع صورة
-            </button>
-            <button class="attachment-option" id="cameraBtn" type="button">
-              <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path><circle cx="12" cy="13" r="3"></circle></svg>
-              الكاميرا
-            </button>
-          </div>
-
-          <input id="fileInput" type="file" multiple hidden>
-          <input id="imageInput" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
-          <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
-        <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
-
-        <div class="input-tools">
-
           <div class="input-actions">
-
             <button
               class="tool-btn"
               id="plusBtn"
@@ -1310,15 +1367,15 @@ button{
               type="button"
               title="إضافة Emoji"
               aria-label="إضافة Emoji">
-              😊
+              <span aria-hidden="true">😊</span>
             </button>
-
           </div>
+
           <div class="composer-spacer" aria-hidden="true"></div>
 
           <div class="send-actions">
-          <button
-              class="tool-btn"
+            <button
+              class="tool-btn mic-btn"
               id="micBtn"
               type="button"
               title="التحدث إلى CodeMind AI"
@@ -1330,18 +1387,18 @@ button{
               </svg>
             </button>
 
-          <button
-            class="send-btn"
-            id="sendBtn"
-            type="button"
-            aria-label="إرسال">
-            ➤
-          </button>
-
+            <button
+              class="send-btn"
+              id="sendBtn"
+              type="button"
+              aria-label="إرسال">
+              <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12h15"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </button>
           </div>
 
-
-  
         </div>
 
       </div>
