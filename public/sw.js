@@ -1,4 +1,4 @@
-const CACHE_NAME = 'codemind-ai-v1';
+const CACHE_NAME = 'codemind-ai-v2';
 
 const APP_SHELL = [
   '/',
