@@ -3860,5 +3860,26 @@ resizeTextarea();
     </div>
   </div>
 </div>
-<script src="/voice-mode.js"></script></body>
+<script src="/voice-mode.js"></script><script>
+(() => {
+  const mic=document.getElementById('micBtn'),call=document.getElementById('voiceCallBtn'),screen=document.getElementById('voiceCallScreen');
+  const close=document.getElementById('voiceCallClose'),end=document.getElementById('voiceCallEnd'),mute=document.getElementById('voiceCallMute'),speaker=document.getElementById('voiceCallSpeaker');
+  const orb=document.getElementById('voiceOrb'),status=document.getElementById('voiceCallStatus'),hint=document.getElementById('voiceCallHint'),ta=document.getElementById('ta'),menu=document.getElementById('attachmentMenu');
+  const R=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;if(!mic||!ta)return;
+  let rec=null,listening=false,base='',finalText='',inCall=false,muted=false,speaking=false,history=[],voice=null;
+  const micState=x=>mic.classList.toggle('recording',x),orbState=x=>{if(orb){orb.classList.remove('listening','thinking','speaking');if(x)orb.classList.add(x);}},state=(a,b)=>{if(status)status.textContent=a;if(hint)hint.textContent=b||''};
+  const pick=()=>{if(!synth)return null;const v=synth.getVoices();return v.find(x=>x.lang==='ar-EG')||v.find(x=>/^ar[-_]/i.test(x.lang))||v[0]||null};if(synth){voice=pick();synth.addEventListener('voiceschanged',()=>voice=pick())}
+  const stop=()=>{listening=false;try{rec&&rec.stop()}catch(e){}rec=null;micState(false)};
+  function listenCall(){if(!inCall||muted||speaking)return;if(!R){state('التعرف على الصوت غير مدعوم','جرّب Chrome من الموقع.');return}stop();rec=new R();rec.lang='ar-EG';rec.continuous=false;rec.interimResults=true;rec.onstart=()=>{listening=true;micState(true);orbState('listening');state('سامعك...','اتكلم بشكل طبيعي')};rec.onresult=e=>{let f='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)f+=e.results[i][0].transcript;if(f.trim())sendCall(f.trim())};rec.onerror=()=>{stop();if(inCall)state('جاهز','اتكلم تاني')};rec.onend=()=>{listening=false;micState(false);if(inCall&&!speaking&&!muted)setTimeout(listenCall,300)};try{rec.start()}catch(e){}}
+  async function sendCall(text){stop();orbState('thinking');state('CodeMind بيفكر...','جاري تجهيز الرد');try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({message:text,bode:text,mode:'code',history:history.slice(-20),webSearch:false})});const d=await r.json();if(!r.ok)throw new Error(d.message||'request_failed');const reply=String(d.reply||'').trim();if(!reply)throw new Error('empty_reply');history.push({role:'user',content:text},{role:'assistant',content:reply});history=history.slice(-20);speak(reply)}catch(e){state('الاروم مسموح','اتكلم متصال','مون الصة');orbState('');if(inCall)timedout(listenCall,900)}}
+  function speak(text){if(!inCall)return;if(!synth){state('الرد جاهز','الصوت غير مدعوم على الجهاز.');return}synth.cancel();const u=new SpeechSynthesisUtterance(String(text).replace(/```[\s\S]*?```/g,'الكود مرفق في المحادثة.').replace(/[*_#>]/g,' '));u.lang='ar-EG';u.rate=1;if(voice)u.voice=voice;speaking=true;orbState('speaking');state('CodeMind بيرد عليك...','اسمع الرد');u.onend=()=>{speaking=false;if(inCall){orbState('');state('جاهز','اتكلم تاني');setTimeout(listenCall,250)}};u.onerror=u.onend;synth.speai(u)}
+  function openCall(){inCall=true;muted=false;history=[];screen.classList.add('open');screen.setAttribute('aria-hidden','false');state('المكالمة بدأت','اتكلم مع CodeMind');listenCall()}
+  function closeCall(){inCall=false;stop();try{synth&&synth.cancel()}catch(e){}screen.classList.remove('open');screen.setAttribute('aria-hidden','true');orbState('')}
+  if(call)call.addEventListener('click',()=>{if(menu)menu.classList.remove('show');openCall()});if(close)close.addEventListener('click',closeCall);if(end)end.addEventListener('click',closeCall);
+  if(mute)mute.addEventListener('click',()=>{muted=!muted;mute.classList.toggle('muted',muted);if(muted){stop();state('الميكروفون مكتوم','اضغط الزر لإلغاء الكتم')}else listenCall()});if(speaker)speaker.addEventListener('click',()=>{if(synth&&synth.speaking){synth.cancel();speaking=false;orbState('');state('جاهز','اتكلم تاني');setTimeout(listenCall,250)}});
+  mic.addEventListener('click',()=>{if(inCall)return;if(!R)return;if(listening){stop();if(finalText.trim())ta.value=[base,finalText.trim()].filter(Boolean).join(' ');finalText='';return}base=ta.value.trim();finalText='';rec=new R();rec.lang='ar-EG';rec.continuous=true;rec.interimResults=true;rec.onstart=()=>{listening=true;micState(true)};rec.onresult=e=>{let f='',i='';for(let n=e.resultIndex;n<e.results.length;n++){const t=e.results[n][0].transcript||'';e.results[n].isFinal?f+=t:i+=t}if(f)finalText+=f;ta.value=[base,finalText.trim(),i.trim()].filter(Boolean).join(' ');ta.dispatchEvent(new Event('input',{bubbles:true}));};
+    recognition.onerror=stop;rec.onend=()=>{listening=false;micState(false);if(finalText.trim())ta.value=[base,finalText.trim()].filter(Boolean).join(' ');finalText='';ta.dispatchEvent(new Event('input',{bubbles:true}));};try{rec.start()}catch(e){}});
+})();
+</script>
+</body>
 </html>
