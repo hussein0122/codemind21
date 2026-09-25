@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { getAiSettings } from './auth.service.js';
 
 const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_MAX_TOKENS = 2400;
@@ -19,12 +20,14 @@ export function buildSystemPrompt(mode = 'code') { return `${persona}\n\n${modes
 export async function createCompletion({ messages, mode, structured = false }) {
   const client = createAiClient();
   if (!client) throw new Error('AI_NOT_CONFIGURED');
+  const settings = await getAiSettings();
+  const systemPrompt = buildSystemPrompt(mode) + (settings?.concise ? '\\n\\nالتزم بالإيجاز افتراضيًا؛ لا تتجاوز 5 نقاط إلا إذا طلب المستخدم التفصيل.' : '');
   const request = {
-    model: process.env.GROQ_MODEL || DEFAULT_MODEL,
-    messages: [{ role: 'system', content: buildSystemPrompt(mode) }, ...messages],
-    max_completion_tokens: Math.min(Math.max(Number(process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS), 512), 8000),
+    model: settings?.model || process.env.GROQ_MODEL || DEFAULT_MODEL,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    max_completion_tokens: Math.min(Math.max(Number(settings?.max_tokens || process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS), 512), 8000),
     include_reasoning: false,
-    temperature: structured ? 0.1 : 0.3,
+    temperature: structured ? 0.1 : Number(settings?.temperature ?? 0.3),
     stream: false
   };
   if (structured) request.response_format = { type: 'json_object' };
