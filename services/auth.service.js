@@ -25,9 +25,19 @@ export async function getAiSettings() {
 export async function initializeAuth() {
   if (!pool) return false;
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(120) NOT NULL,
+      email VARCHAR(320) NOT NULL UNIQUE,
+      password_hash TEXT,
+      password_salt TEXT,
+      role VARCHAR(20) NOT NULL DEFAULT 'user',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_salt TEXT;
     ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+    CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users (lower(email));
     CREATE TABLE IF NOT EXISTS ai_settings (
       id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       model VARCHAR(160) NOT NULL DEFAULT 'openai/gpt-oss-20b',
@@ -43,15 +53,18 @@ export async function initializeAuth() {
   if (adminEmail && adminPassword) {
     if (adminPassword.length < 12) throw new Error('ADMIN_PASSWORD must be at least 12 characters');
     const existing = await pool.query('SELECT id FROM users WHERE lower(email) = $1', [adminEmail]);
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = await hashPassword(adminPassword, salt);
     if (!existing.rowCount) {
-      const salt = crypto.randomBytes(16).toString('hex');
-      const hash = await hashPassword(adminPassword, salt);
       await pool.query(
         "INSERT INTO users (name,email,password_hash,password_salt,role) VALUES ($1,$2,$3,$4,'admin')",
         ['CodeMind Admin', adminEmail, hash, salt]
       );
     } else {
-      await pool.query("UPDATE users SET role = 'admin' WHERE lower(email) = $1", [adminEmail]);
+      await pool.query(
+        "UPDATE users SET role = 'admin', password_hash = $1, password_salt = $2 WHERE lower(email) = $3",
+        [hash, salt, adminEmail]
+      );
     }
   }
   return true;
