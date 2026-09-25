@@ -713,6 +713,11 @@ button{
   justify-content:space-between;
   align-items:center;
   margin-top:8px;
+  direction:rtl;
+}
+
+.input-tools > .mic-btn-placeholder{
+  display:none;
 }
 
 .input-actions{
@@ -889,6 +894,10 @@ button{
 
 .tool-btn.active{
   color:#ff8b9b;
+}
+
+.input-tools > #micBtn{
+  flex-shrink:0;
 }
 
 .send-btn{
@@ -1316,6 +1325,8 @@ button{
               😊
             </button>
 
+          </div>
+
             <button
               class="tool-btn"
               id="micBtn"
@@ -1328,8 +1339,6 @@ button{
                 <path d="M12 17v5M8 22h8"></path>
               </svg>
             </button>
-
-          </div>
 
           <button
             class="send-btn"
@@ -1980,134 +1989,6 @@ function speakText(button,encoded){
   window.speechSynthesis.speak(
     utterance
   );
-
-}
-
-
-/* =========================================================
-   SPEECH RECOGNITION
-========================================================= */
-
-const SpeechRecognition =
-  window.SpeechRecognition ||
-  window.webkitSpeechRecognition;
-
-let recognition = null;
-let isListening = false;
-let speechPrefix = '';
-
-if(SpeechRecognition){
-
-  recognition =
-    new SpeechRecognition();
-
-  recognition.lang =
-    'ar-SA';
-
-  recognition.continuous =
-    false;
-
-  recognition.interimResults =
-    true;
-
-  recognition.onstart =
-    function(){
-
-      isListening = true;
-
-      speechPrefix =
-        ta.value.trim()
-          ? ta.value.trim() + ' '
-          : '';
-
-      micBtn.classList.add(
-        'active'
-      );
-
-      micBtn.textContent =
-        '⏹';
-
-    };
-
-  recognition.onresult =
-    function(event){
-
-      const transcript =
-        Array.from(
-          event.results
-        )
-        .map(function(result){
-
-          return result[0].transcript;
-
-        })
-        .join('');
-
-      ta.value =
-        speechPrefix + transcript;
-
-      resizeTextarea();
-
-    };
-
-  recognition.onerror =
-    function(event){
-
-      if(event.error !== 'aborted'){
-
-        statusBanner.textContent =
-          '⚠️ تعذر تشغيل الميكروفون: ' +
-          event.error;
-
-      }
-
-    };
-
-  recognition.onend =
-    function(){
-
-      isListening = false;
-
-      micBtn.classList.remove(
-        'active'
-      );
-
-      micBtn.textContent =
-        '🎙️';
-
-    };
-
-  micBtn.addEventListener(
-    'click',
-    function(){
-
-      if(isListening){
-
-        recognition.stop();
-
-      }else{
-
-        try{
-
-          recognition.start();
-
-        }catch(error){
-
-          console.log(error);
-
-        }
-
-      }
-
-    }
-  );
-
-}else{
-
-  micBtn.disabled = true;
-
-  micBtn.title =
-    'التعرف الصوتي غير مدعوم في هذا المتصفح';
 
 }
 
