@@ -7,7 +7,7 @@ import archiver from 'archiver';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { isAiConfigured, createCompletion } from './services/ai.service.js';
+import { isAiConfigured, createCompletion, transcribeAudio } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
 import { authDatabaseReady, checkAuthDatabase, initializeAuth, registerAuthRoutes, optionalAuth, requireAuth } from './services/auth.service.js';
@@ -23,7 +23,7 @@ const port = Number(process.env.PORT || 3000);
 if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
-app.use(express.json({ limit: '4mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
   req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(part => part.trim()).filter(Boolean).map(part => {
     const index = part.indexOf('=');
@@ -122,6 +122,33 @@ function buildSafeHistory(history = []) {
 
 registerAuthRoutes(app);
 
+app.post('/api/transcribe',
+  express.raw({
+    type: (req) => /^(audio\\/|video\\/webm)/i.test(String(req.headers['content-type'] || '')),
+    limit: '25mb'
+  }),
+  async (req, res) => {
+    if (!isAiConfigured()) {
+      return res.status(503).json({ error: 'ai_not_configured', message: 'GROQ_API_KEY غير موجود في إعدادات Vercel.' });
+    }
+    const audio = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+    if (!audio.length) {
+      return res.status(400).json({ error: 'empty_audio', message: 'لم يتم تسجيل صوت.' });
+    }
+    try {
+      const transcript = await transcribeAudio({
+        buffer: audio,
+        mimeType: String(req.headers['content-type'] || 'audio/webm').split(';')[0],
+        filename: 'codemind-voice.webm',
+        prompt: 'اللهجة المصرية والعربية. اكتب الكلام كما قيل مع الحفاظ على أسماء البرمجة والتقنية مثل CodeMind و JavaScript و React و Node.js و API و Supabase و PostgreSQL.'
+      });
+      return res.json({ text: String(transcript || '').trim() });
+    } catch (error) {
+      console.error('Audio transcription failed:', error);
+      return res.status(502).json({ error: 'transcription_failed', message: 'تعذر تحويل الصوت إلى نص. حاول مرة أخرى.' });
+    }
+  });
+
 app.get('/api/chats', requireAuth, async (req,res,next) => {
   try { res.json({ chats: await listConversations(req.user.id) }); } catch (error) { next(error); }
 });
@@ -157,23 +184,12 @@ app.get('/health', async (req, res) => {
   });
 });
 
-app.post('/api/project-zip', express.json({ limit: '7mb' }), (req, res) => {
-  const input = req.body;
-  if (!input || !Array.isArray(input.files)) {
-    return res.status(400).json({ error: 'invalid_project', message: 'بيانات المشروع غير صحيحة.' });
+app.post('/api/project-zip', express.json({ limit: '20mb' }), (req, res) => {
+  const project = normalizeProject(req.body);
+  if (!project) {
+    return res.status(400).json({ error: 'invalid_project', message: 'بيانات المشروع غير صحيحة أو أكبر من الحد المسموح.' });
   }
-  const files = input.files.slice(0, 60)
-    .filter((file) => file && typeof file.content === 'string')
-    .map((file) => ({
-      path: String(file.path || '').replace(/\\/g, '/').split('/').filter((part) => part && part !== '.' && part !== '..').join('/'),
-      content: file.content
-    }))
-    .filter((file) => file.path);
-  const size = files.reduce((total, file) => total + Buffer.byteLength(file.content, 'utf8'), 0);
-  if (!files.length || size > 5 * 1024 * 1024) {
-    return res.status(400).json({ error: 'invalid_project', message: 'بيانات المشروع غير صحيحة أو تتجاوز الحد المسموح.' });
-  }
-  const projectName = String(input.name || 'codemind-project').replace(/[^a-zA-Z0-9_\-\u0600-\u06FF ]/g, '').trim().slice(0, 80) || 'codemind-project';
+  const projectName = project.name;
   const safeFileName = projectName.replace(/[^a-zA-Z0-9_\-\u0600-\u06FF]+/g, '-') || 'codemind-project';
   res.status(200).set({
     'Content-Type': 'application/zip',
@@ -187,7 +203,7 @@ app.post('/api/project-zip', express.json({ limit: '7mb' }), (req, res) => {
     res.end();
   });
   archive.pipe(res);
-  for (const file of files) archive.append(file.content, { name: `${projectName}/${file.path}` });
+  for (const file of project.files) archive.append(file.content, { name: `${projectName}/${file.path}` });
   archive.finalize();
 });
 
