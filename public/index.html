@@ -1417,7 +1417,8 @@ button{
               type="button"
               title="إضافة مرفق"
               aria-label="إضافة مرفق"
-              aria-expanded="false">
+              aria-expanded="false"
+              onclick="return window.CodeMindToggleAttachmentMenu(event)">
               <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5v14M5 12h14"></path>
               </svg>
@@ -3185,28 +3186,28 @@ async function uploadFiles(fileList){
 }
 
 function closeAttachmentMenu(){
+  if(!attachmentMenu) return;
   attachmentMenu.classList.remove('show');
   attachmentMenu.style.display = 'none';
   plusBtn.setAttribute('aria-expanded','false');
 }
 
 function openAttachmentMenu(){
-  const open = !attachmentMenu.classList.contains('show');
-  if(open){
+  if(!attachmentMenu) return;
+
+  const willOpen = !attachmentMenu.classList.contains('show');
+
+  if(willOpen){
     attachmentMenu.classList.add('show');
     attachmentMenu.style.display = 'flex';
+    attachmentMenu.style.visibility = 'visible';
+    attachmentMenu.style.opacity = '1';
     plusBtn.setAttribute('aria-expanded','true');
-    emojiPicker.classList.remove('show');
+    if(emojiPicker) emojiPicker.classList.remove('show');
   }else{
     closeAttachmentMenu();
   }
 }
-
-plusBtn.addEventListener('click', function(event){
-  event.preventDefault();
-  event.stopPropagation();
-  openAttachmentMenu();
-});
 
 cameraBtn.addEventListener('click', function(){
   attachmentMenu.classList.remove('show');
@@ -4101,35 +4102,35 @@ resizeTextarea();
 })();
 </script>
 <script>
-(() => {
-  const bind = () => {
-    const plus = document.getElementById('plusBtn');
-    const menu = document.getElementById('attachmentMenu');
-    if (!plus || !menu || plus.dataset.codemindPlusBound === '1') return;
-    plus.dataset.codemindPlusBound = '1';
-    plus.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const open = !menu.classList.contains('show');
-      if (open) {
-        menu.classList.add('show');
-        menu.style.display = 'flex';
-        menu.style.visibility = 'visible';
-        menu.style.opacity = '1';
-        plus.setAttribute('aria-expanded', 'true');
-      } else {
-        menu.classList.remove('show');
-        menu.style.display = 'none';
-        plus.setAttribute('aria-expanded', 'false');
-      }
-    }, true);
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bind, { once: true });
-  } else {
-    bind();
+window.CodeMindToggleAttachmentMenu = function(event){
+  if(event){
+    event.preventDefault();
+    event.stopPropagation();
   }
-})();
+
+  const plus = document.getElementById('plusBtn');
+  const menu = document.getElementById('attachmentMenu');
+  const emoji = document.getElementById('emojiPicker');
+
+  if(!plus || !menu) return false;
+
+  const willOpen = !menu.classList.contains('show');
+
+  if(willOpen){
+    menu.classList.add('show');
+    menu.style.display = 'flex';
+    menu.style.visibility = 'visible';
+    menu.style.opacity = '1';
+    plus.setAttribute('aria-expanded','true');
+    if(emoji) emoji.classList.remove('show');
+  }else{
+    menu.classList.remove('show');
+    menu.style.display = 'none';
+    plus.setAttribute('aria-expanded','false');
+  }
+
+  return false;
+};
 </script>
 </body>
 </html>
