@@ -695,6 +695,8 @@ button{
 .input-zone{
   padding:14px 18px 18px;
   flex-shrink:0;
+  position:relative;
+  z-index:1000;
 }
 
 .input-box{
@@ -3901,7 +3903,7 @@ resizeTextarea();
     </div>
   </div>
 </div>
-<script src="/voice-mode.js"></script><script>
+<script>
 (() => {
   const mic=document.getElementById("micBtn"), call=document.getElementById("voiceCallBtn"), screen=document.getElementById("voiceCallScreen");
   const close=document.getElementById("voiceCallClose"), end=document.getElementById("voiceCallEnd"), mute=document.getElementById("voiceCallMute"), speaker=document.getElementById("voiceCallSpeaker");
@@ -3969,6 +3971,9 @@ resizeTextarea();
       statusBanner.textContent="🧠 بحوّل صوتك لنص بدقة...";
     }
     try{
+      if(blob.size > 4 * 1024 * 1024){
+        throw new Error("audio_too_large");
+      }
       const response=await fetch("/api/transcribe",{
         method:"POST",
         headers:{"Content-Type":blob.type||"audio/webm"},
@@ -3981,7 +3986,9 @@ resizeTextarea();
     }catch(error){
       console.error("Whisper transcription failed:",error);
       if(typeof statusBanner!=="undefined" && statusBanner){
-        statusBanner.textContent="⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
+        statusBanner.textContent=error?.message==="audio_too_large"
+          ? "⚠️ التسجيل طويل جدًا. اتكلم لمدة أقصر وحاول مرة أخرى."
+          : "⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
       }
     }finally{
       try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
@@ -3997,6 +4004,9 @@ resizeTextarea();
   async function startMediaRecording(){
     if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)return false;
     try{
+      if(!window.isSecureContext){
+        throw new Error("insecure_context");
+      }
       mediaStream=await navigator.mediaDevices.getUserMedia({audio:{
         channelCount:1,
         echoCancellation:true,
@@ -4004,7 +4014,7 @@ resizeTextarea();
         autoGainControl:true
       }});
       const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(type=>MediaRecorder.isTypeSupported(type));
-      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred}:undefined);
+      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000});
       mediaChunks=[];
       mediaRecorder.ondataavailable=(event)=>{if(event.data?.size)mediaChunks.push(event.data)};
       mediaRecorder.onstop=()=>{
@@ -4015,12 +4025,25 @@ resizeTextarea();
       mediaRecorder.start();
       micState(true);
       if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اتكلم بوضوح، واضغط الميك مرة ثانية لما تخلص.";
-      mediaTimer=setTimeout(stopMediaRecording,30000);
+      mediaTimer=setTimeout(stopMediaRecording,20000);
       return true;
     }catch(error){
       console.warn("MediaRecorder microphone unavailable:",error);
       try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
       mediaStream=null;
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        if(error?.message==="insecure_context"){
+          statusBanner.textContent="⚠️ الميكروفون يحتاج HTTPS. افتح نسخة الموقع على رابط Vercel الآمن.";
+        }else if(error?.name==="NotAllowedError"){
+          statusBanner.textContent="⚠️ المتصفح منع الميكروفون. افتح إعدادات الموقع > الميكروفون > سماح، ثم أعد المحاولة.";
+        }else if(error?.name==="NotFoundError"){
+          statusBanner.textContent="⚠️ لم يتم العثور على ميكروفون في الجهاز.";
+        }else if(error?.name==="NotReadableError"){
+          statusBanner.textContent="⚠️ الميكروفون مستخدم بواسطة تطبيق آخر. أغلقه وحاول مرة أخرى.";
+        }else{
+          statusBanner.textContent="⚠️ تعذر فتح الميكروفون: "+(error?.message||"خطأ غير معروف");
+        }
+      }
       return false;
     }
   }
@@ -4075,6 +4098,37 @@ resizeTextarea();
     if(!started)startBrowserRecognition();
   });
 
+})();
+</script>
+<script>
+(() => {
+  const bind = () => {
+    const plus = document.getElementById('plusBtn');
+    const menu = document.getElementById('attachmentMenu');
+    if (!plus || !menu || plus.dataset.codemindPlusBound === '1') return;
+    plus.dataset.codemindPlusBound = '1';
+    plus.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const open = !menu.classList.contains('show');
+      if (open) {
+        menu.classList.add('show');
+        menu.style.display = 'flex';
+        menu.style.visibility = 'visible';
+        menu.style.opacity = '1';
+        plus.setAttribute('aria-expanded', 'true');
+      } else {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+        plus.setAttribute('aria-expanded', 'false');
+      }
+    }, true);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind, { once: true });
+  } else {
+    bind();
+  }
 })();
 </script>
 </body>
