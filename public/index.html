@@ -264,6 +264,20 @@ button{
   box-shadow:0 0 10px rgba(62,207,142,.5);
 }
 
+.install-app-btn{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+}
+
+.install-app-btn:hover{
+  border-color:var(--border2);
+}
+
+.install-app-btn[hidden]{
+  display:none;
+}
+
 .model-badge{
   font-size:.75rem;
   color:var(--muted);
@@ -1221,6 +1235,15 @@ button{
         </span>
 
       </div>
+
+      <button
+        class="mode-select install-app-btn"
+        id="installAppBtn"
+        type="button"
+        aria-label="تثبيت CodeMind AI"
+        hidden>
+        📲 تثبيت التطبيق
+      </button>
 
       <div class="model-badge">
         CodeMind — Real AI
@@ -3656,6 +3679,49 @@ function renderSavedConversation(){
 /* =========================================================
    INITIALIZE
 ========================================================= */
+
+let deferredInstallPrompt = null;
+const installAppBtn = document.getElementById('installAppBtn');
+
+function isStandaloneApp(){
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+}
+
+window.addEventListener('beforeinstallprompt', function(event){
+  event.preventDefault();
+  deferredInstallPrompt = event;
+
+  if(installAppBtn && !isStandaloneApp()){
+    installAppBtn.hidden = false;
+  }
+});
+
+if(installAppBtn){
+  installAppBtn.addEventListener('click', async function(){
+    if(!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+
+    try{
+      await deferredInstallPrompt.userChoice;
+    }catch(error){
+      console.warn('Install prompt failed:', error);
+    }
+
+    deferredInstallPrompt = null;
+    installAppBtn.hidden = true;
+  });
+}
+
+window.addEventListener('appinstalled', function(){
+  deferredInstallPrompt = null;
+  if(installAppBtn) installAppBtn.hidden = true;
+});
+
+if(isStandaloneApp() && installAppBtn){
+  installAppBtn.hidden = true;
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
