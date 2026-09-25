@@ -72,6 +72,6 @@ export function isTextAttachment(file) {
 export function attachmentResult(file) {
   const meta = { name: safeFilename(file.filename), type: file.contentType, size: file.data.length, kind: IMAGE_TYPES.has(file.contentType) ? 'image' : 'file' };
   if (isTextAttachment(file)) return { ...meta, content: file.data.toString('utf8', 0, 2 * 1024 * 1024) };
-  if (IMAGE_TYPES.has(file.contentType)) return { ...meta, dataUrl: `data:${file.contentType};base64,${file.data.toString('base64')}` };
+  if (IMAGE_TYPES.has(file.contentType)) return meta;
   return meta;
 }
