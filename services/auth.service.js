@@ -15,6 +15,13 @@ const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const secret = () => process.env.AUTH_SECRET || '';
 
 export function authDatabaseReady() { return Boolean(pool); }
+export async function getAiSettings() {
+  if (!pool) return null;
+  try {
+    const { rows } = await pool.query('SELECT model,max_tokens,temperature,concise FROM ai_settings WHERE id=1');
+    return rows[0] || null;
+  } catch { return null; }
+}
 export async function initializeAuth() {
   if (!pool) return false;
   await pool.query(`
