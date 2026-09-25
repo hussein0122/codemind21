@@ -3080,39 +3080,43 @@ async function uploadFiles(fileList){
           throw new Error('تعذر تجهيز الصورة للتحليل. جرّب صورة أصغر.');
         }
       }
-      const formData = new FormData();
-      formData.append('files', file, file.name);
+      // الصور يتم تجهيزها محليًا وإرسالها مباشرة إلى نموذج الرؤية.
+      // لا نرسل الصورة مرة ثانية إلى /api/upload، لتجنب فشل multipart
+      // ولأن الـAI يحتاج dataUrl الحالي وليس تخزين الصورة على السيرفر.
+      if(localItem.kind === 'image'){
+        localItem.status = 'ready';
+        renderPendingAttachments();
+      }else{
+        const formData = new FormData();
+        formData.append('files', file, file.name);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal
-      });
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
 
-      const data = await response.json().catch(function(){ return {}; });
+        const data = await response.json().catch(function(){ return {}; });
 
-      if(!response.ok || !Array.isArray(data.attachments) || !data.attachments.length){
-        throw new Error(data.message || 'تعذر رفع الملف.');
+        if(!response.ok || !Array.isArray(data.attachments) || !data.attachments.length){
+          throw new Error(data.message || 'تعذر رفع الملف.');
+        }
+
+        const uploaded = data.attachments[0];
+        Object.assign(localItem, uploaded, {
+          name: uploaded.name || localItem.name,
+          type: uploaded.type || localItem.type,
+          size: uploaded.size || localItem.size,
+          kind: uploaded.kind || localItem.kind,
+          status: 'ready'
+        });
+
+        if(localItem.previewUrl && localItem.previewUrl.startsWith('blob:')){
+          URL.revokeObjectURL(localItem.previewUrl);
+        }
+
+        renderPendingAttachments();
       }
-
-      const uploaded = data.attachments[0];
-      Object.assign(localItem, uploaded, {
-        name: uploaded.name || localItem.name,
-        type: uploaded.type || localItem.type,
-        size: uploaded.size || localItem.size,
-        kind: uploaded.kind || localItem.kind,
-        status: 'ready'
-      });
-
-      if(localItem.kind === 'image' && uploaded.dataUrl){
-        localItem.previewUrl = uploaded.dataUrl;
-      }
-
-      if(localItem.previewUrl && localItem.previewUrl.startsWith('blob:')){
-        URL.revokeObjectURL(localItem.previewUrl);
-      }
-
-      renderPendingAttachments();
     }catch(error){
       if(error.name === 'AbortError'){
         localItem.status = 'error';
