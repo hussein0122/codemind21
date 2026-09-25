@@ -22,6 +22,12 @@ const port = Number(process.env.PORT || 3000);
 
 if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
+// Explicitly allow microphone/camera access for the top-level CodeMind page.
+// Browsers can reject getUserMedia with NotAllowedError when Permissions Policy blocks the device.
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'microphone=(self), camera=(self)');
+  next();
+});
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
@@ -125,7 +131,7 @@ registerAuthRoutes(app);
 app.post('/api/transcribe',
   express.raw({
     type: (req) => /^(audio\\/|video\\/webm)/i.test(String(req.headers['content-type'] || '')),
-    limit: '25mb'
+    limit: '4mb'
   }),
   async (req, res) => {
     if (!isAiConfigured()) {
