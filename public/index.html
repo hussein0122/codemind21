@@ -2738,34 +2738,17 @@ async function typeAiResponse(
       '<span class="typing-cursor"></span>';
 
     /*
-      ننزل بالشات مرة واحدة فقط عند أول حرف
-      من رد الـAI، لتنبيه المستخدم أن الرد بدأ.
-      بعد ذلك لا نعمل auto-scroll أثناء الكتابة.
+      نخلي الشاشة تتابع بداية رد الـAI تلقائيًا أثناء الكتابة.
+      استخدام scrollIntoView على نص الرد نفسه يحرّك
+      منطقة الشات الفعلية، وليس مجرد قيمة شريط الـscroll.
     */
-    if(index === chunkSize){
-      requestAnimationFrame(function(){
-        /*
-          نثبت الشاشة عند بداية رسالة الـAI نفسها،
-          وليس عند آخر الشات، حتى يظهر أول حرف
-          من الرد للمستخدم مباشرة.
-        */
-        const chatRect =
-          chatScroll.getBoundingClientRect();
-
-        const messageRect =
-          message.getBoundingClientRect();
-
-        const targetTop =
-          chatScroll.scrollTop +
-          (messageRect.top - chatRect.top) -
-          10;
-
-        chatScroll.scrollTo({
-          top: Math.max(0, targetTop),
-          behavior: 'auto'
-        });
+    requestAnimationFrame(function(){
+      textElement.scrollIntoView({
+        behavior: 'auto',
+        block: 'start',
+        inline: 'nearest'
       });
-    }
+    });
 
     await new Promise(
       function(resolve){
