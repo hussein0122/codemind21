@@ -1164,6 +1164,10 @@ button{
 @keyframes voicePulse{0%,100%{box-shadow:0 0 0 0 rgba(79,124,255,.25)}50%{box-shadow:0 0 0 12px rgba(79,124,255,0)}}
 .voice-stop{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;padding:7px 12px;cursor:pointer}
 @media(max-width:600px){.voice-status{bottom:86px;inset-inline:10px}}
+
+.voice-controls{display:flex;gap:8px;align-items:center;margin-top:12px}
+.voice-rate{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 9px;font-family:'Cairo'}
+.voice-rate-label{font-size:.72rem;color:var(--muted)}
 </style>
 </head>
 
@@ -3807,7 +3811,7 @@ resizeTextarea();
     <div><div class="voice-status-title">🎙️ CodeMind Voice</div><div class="voice-status-text" id="voiceStatusText">جاهز لسماعك</div></div>
     <div class="voice-pulse">🎙️</div>
   </div>
-  <button class="voice-stop" id="voiceStopBtn" type="button">إنهاء المحادثة</button>
+  <button class="voice-stop" id="voiceStopBtn" type="button">إنهاء المحادثة</button><div class="voice-controls"><span class="voice-rate-label">سرعة الصوت</span><select class="voice-rate" id="voiceRate"><option value="0.85">هادئ</option><option value="1" selected>طبيعي</option><option value="1.15">سريع</option></select></div>
 </div>
 <script src="/voice-mode.js"></script></body>
 </html>
