@@ -1,0 +1,12 @@
+{
+  "appId": "com.codemind.ai",
+  "appName": "CodeMind AI",
+  "webDir": "public",
+  "server": {
+    "url": "https://codemind21.vercel.app",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
