@@ -26,7 +26,7 @@ export async function transcribeAudio({ buffer, mimeType = 'audio/webm', filenam
     file,
     model: process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3',
     language: 'ar',
-    prompt,
+    prompt: String(prompt || 'اكتب باللهجة المصرية والعربية كما قيلت. لا تحوّل الكلمات إلى فصحى ولا تغيّر أسماء البرمجة والتقنية. صحّح فقط الأخطاء الواضحة الناتجة من التعرف على الصوت.'),
     response_format: 'json',
     temperature: 0
   });
