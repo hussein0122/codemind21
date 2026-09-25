@@ -2905,6 +2905,11 @@ function removeLastUserMessage(text){
    ATTACHMENTS
 ========================================================= */
 
+let pendingAttachments = [];
+const uploadControllers = new Map();
+
+
+
 function formatBytes(bytes){
   const size = Number(bytes) || 0;
   if(size < 1024) return size + ' B';
