@@ -20,7 +20,8 @@ export async function createCompletion({ messages, mode, structured = false }) {
   const request = {
     model: process.env.GROQ_MODEL || DEFAULT_MODEL,
     messages: [{ role: 'system', content: buildSystemPrompt(mode) }, ...messages],
-    max_tokens: Math.min(Math.max(Number(process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS), 1000), 16000),
+    max_completion_tokens: Math.min(Math.max(Number(process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS), 1000), 16000),
+    include_reasoning: false,
     temperature: structured ? 0.1 : 0.3,
     stream: false
   };
