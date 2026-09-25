@@ -5,7 +5,7 @@ const CURRENT_PROJECT_KEY = 'codemind_current_project_v1';
 export function isProjectRequest(message, currentProject = null) {
   if (currentProject) return true;
   const text = String(message || '').toLowerCase();
-  return ['برمجلي موقع', 'برمج لي موقع', 'اعمللي موقع', 'اعمل لي موقع', 'برمجلي تطبيق', 'برمج لي تطبيق', 'اعمللي تطبيق', 'اعمل لي تطبيق', 'برمجلي مشروع', 'برمج لي مشروع', 'اعمللي مشروع', 'اعمل لي مشروع', 'ابني موقع', 'ابني تطبيق', 'ابني مشروع', 'مشروع كامل', 'ملفات المشروع', 'build a website', 'build an app', 'build a project', 'create a website', 'create an app', 'create a project', 'full project', 'complete project', 'ecommerce', 'متجر الكتروني', 'متجر إلكتروني'].some((keyword) => text.includes(keyword));
+  return ['برمجلي موقع', 'برمج لي موقع', 'اعمللي موقع', 'اعمل لي موقع', 'صمملي موقع', 'صمم لي موقع', 'أنشئ موقع', 'انشئ موقع', 'ابني موقع', 'برمجلي تطبيق', 'برمج لي تطبيق', 'اعمللي تطبيق', 'اعمل لي تطبيق', 'صمملي تطبيق', 'صمم لي تطبيق', 'أنشئ تطبيق', 'انشئ تطبيق', 'ابني تطبيق', 'برمجلي مشروع', 'برمج لي مشروع', 'اعمللي مشروع', 'اعمل لي مشروع', 'صمملي مشروع', 'صمم لي مشروع', 'أنشئ مشروع', 'انشئ مشروع', 'ابني مشروع', 'مشروع كامل', 'ملفات المشروع', 'build a website', 'build an app', 'build a project', 'create a website', 'create an app', 'create a project', 'full project', 'complete project', 'ecommerce', 'متجر الكتروني', 'متجر إلكتروني'].some((keyword) => text.includes(keyword));
 }
 
 export function buildProjectPrompt(message, currentProject = null) {
