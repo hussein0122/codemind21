@@ -79,7 +79,10 @@ app.post('/api/chat', async (req, res) => {
           type: String(item.type || 'application/octet-stream').slice(0, 120),
           size: Number.isFinite(Number(item.size)) ? Math.max(0, Number(item.size)) : 0,
           kind: item.kind === 'image' ? 'image' : 'file',
-          content: typeof item.content === 'string' ? item.content.slice(0, 120000) : ''
+          content: typeof item.content === 'string' ? item.content.slice(0, 120000) : '',
+          dataUrl: item.kind === 'image' && typeof item.dataUrl === 'string' && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(item.dataUrl)
+            ? item.dataUrl
+            : ''
         }));
     }
 
@@ -94,6 +97,10 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const safeAttachments = normalizeAttachments(attachments);
+    const imageAttachments = safeAttachments.filter((item) => item.kind === 'image' && item.dataUrl).slice(0, 3);
+    if (imageAttachments.length && imageAttachments.some((item) => item.dataUrl.length > 6 * 1024 * 1024)) {
+      return res.status(413).json({ error: 'image_too_large', message: 'الصورة كبيرة جدًا للتحليل. استخدم صورة أصغر.' });
+    }
     const existingProject = normalizeProject(currentProject);
     const projectRequest = isProjectRequest(message, existingProject);
     const messages = buildSafeHistory(history);
@@ -102,7 +109,7 @@ app.post('/api/chat', async (req, res) => {
       : message.trim() + buildAttachmentContext(safeAttachments);
     messages.push({ role: 'user', content: currentContent });
 
-    const completion = await createCompletion({ messages, mode, structured: projectRequest });
+    const completion = await createCompletion({ messages, mode, structured: projectRequest, imageAttachments });
     const rawReply = completion?.choices?.[0]?.message?.content || '';
     if (!rawReply.trim()) {
       return res.json({
