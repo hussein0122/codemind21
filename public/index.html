@@ -721,6 +721,137 @@ button{
   gap:6px;
 }
 
+.input-box.drag-active{
+  border-color:rgba(79,124,255,.8);
+  box-shadow:0 0 0 3px rgba(79,124,255,.12),0 15px 45px rgba(0,0,0,.2);
+}
+
+.attachment-menu{
+  position:absolute;
+  right:14px;
+  bottom:62px;
+  display:none;
+  flex-direction:column;
+  gap:6px;
+  padding:8px;
+  min-width:190px;
+  background:#111722;
+  border:1px solid var(--border2);
+  border-radius:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+  z-index:60;
+}
+
+.attachment-menu.show{
+  display:flex;
+}
+
+.attachment-option{
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--text);
+  text-align:right;
+  border-radius:8px;
+  padding:9px 10px;
+  cursor:pointer;
+  font-size:.78rem;
+}
+
+.attachment-option:hover{
+  background:var(--panel);
+  border-color:var(--border);
+}
+
+.attachments-preview{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-bottom:9px;
+}
+
+.attachment-chip{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  max-width:100%;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.035);
+  border-radius:10px;
+  font-size:.72rem;
+  color:var(--muted);
+}
+
+.attachment-chip img{
+  width:34px;
+  height:34px;
+  object-fit:cover;
+  border-radius:7px;
+}
+
+.attachment-chip .attachment-info{
+  min-width:0;
+}
+
+.attachment-chip .attachment-name{
+  color:var(--text);
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.attachment-chip .attachment-status{
+  font-size:.65rem;
+  color:var(--muted2);
+}
+
+.attachment-remove{
+  border:0;
+  background:transparent;
+  color:var(--muted2);
+  cursor:pointer;
+  font-size:.85rem;
+}
+
+.attachment-remove:hover{
+  color:#fff;
+}
+
+.message-attachments{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:8px;
+}
+
+.message-attachment{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.035);
+  border-radius:9px;
+  padding:5px 8px;
+  font-size:.7rem;
+  color:var(--muted);
+}
+
+.message-attachment img{
+  width:42px;
+  height:42px;
+  object-fit:cover;
+  border-radius:7px;
+}
+
+.upload-error{
+  color:var(--red);
+}
+
+.upload-success{
+  color:var(--green);
+}
+
 .tool-btn{
   width:34px;
   height:34px;
@@ -1123,7 +1254,28 @@ button{
 
         <div class="input-tools">
 
+          <div
+            class="attachment-menu"
+            id="attachmentMenu">
+            <button class="attachment-option" id="chooseFileBtn" type="button">📄 رفع ملف</button>
+            <button class="attachment-option" id="chooseImageBtn" type="button">🖼️ رفع صورة</button>
+          </div>
+
+          <input id="fileInput" type="file" multiple hidden>
+          <input id="imageInput" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
+          <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
+
           <div class="input-actions">
+
+            <button
+              class="tool-btn"
+              id="attachmentBtn"
+              type="button"
+              title="إرفاق ملف أو صورة"
+              aria-label="إرفاق ملف أو صورة">
+              📎
+            </button>
 
             <button
               class="tool-btn"
@@ -1194,6 +1346,27 @@ const micBtn =
 
 const emojiBtn =
   document.getElementById('emojiBtn');
+
+const attachmentBtn =
+  document.getElementById('attachmentBtn');
+
+const attachmentMenu =
+  document.getElementById('attachmentMenu');
+
+const chooseFileBtn =
+  document.getElementById('chooseFileBtn');
+
+const chooseImageBtn =
+  document.getElementById('chooseImageBtn');
+
+const fileInput =
+  document.getElementById('fileInput');
+
+const imageInput =
+  document.getElementById('imageInput');
+
+const attachmentsPreview =
+  document.getElementById('attachmentsPreview');
 
 const emojiPicker =
   document.getElementById('emojiPicker');
@@ -1419,11 +1592,25 @@ function getContextHistory(){
 
     }
 
+    let contextContent = safeContent;
+
+    if(Array.isArray(item.attachments) && item.attachments.length){
+      const attachmentContext = item.attachments.map(function(file){
+        const meta = '[مرفق سابق: ' + (file.name || 'attachment') + ' | ' + (file.type || '') + ']';
+        return file.content
+          ? meta + '\n--- BEGIN PREVIOUS ATTACHMENT ---\n' + String(file.content).slice(0, 18000) + '\n--- END PREVIOUS ATTACHMENT ---'
+          : meta + '\n(بيانات المرفق غير محفوظة بالكامل.)';
+      }).join('\n\n');
+
+      contextContent += '\n\n' + attachmentContext;
+      contextContent = contextContent.slice(-24000);
+    }
+
     result.push({
 
       role:item.role,
 
-      content:safeContent
+      content:contextContent
 
     });
 
@@ -2090,7 +2277,7 @@ modeSelect.addEventListener(
    ADD USER MESSAGE
 ========================================================= */
 
-function addUserMessage(text){
+function addUserMessage(text, attachments = []){
 
   const message =
     document.createElement('div');
@@ -2123,6 +2310,26 @@ function addUserMessage(text){
   message.appendChild(
     bubble
   );
+
+  if(Array.isArray(attachments) && attachments.length){
+    const attachmentsBox = document.createElement('div');
+    attachmentsBox.className = 'message-attachments';
+    attachments.forEach(function(item){
+      const chip = document.createElement('div');
+      chip.className = 'message-attachment';
+      if(item.kind === 'image' && item.dataUrl){
+        const img = document.createElement('img');
+        img.src = item.dataUrl;
+        img.alt = item.name || 'image';
+        chip.appendChild(img);
+      }
+      const label = document.createElement('span');
+      label.textContent = '📎 ' + (item.name || 'attachment');
+      chip.appendChild(label);
+      attachmentsBox.appendChild(chip);
+    });
+    message.querySelector('.bubble').appendChild(attachmentsBox);
+  }
 
   messagesContainer.appendChild(
     message
@@ -2654,6 +2861,213 @@ function removeLastUserMessage(text){
 
 
 /* =========================================================
+   ATTACHMENTS
+========================================================= */
+
+function formatBytes(bytes){
+  const size = Number(bytes) || 0;
+  if(size < 1024) return size + ' B';
+  if(size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+  return (size / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function renderPendingAttachments(){
+  attachmentsPreview.replaceChildren();
+
+  pendingAttachments.forEach(function(item, index){
+    const chip = document.createElement('div');
+    chip.className = 'attachment-chip';
+
+    if(item.kind === 'image' && item.previewUrl){
+      const img = document.createElement('img');
+      img.src = item.previewUrl;
+      img.alt = item.name;
+      chip.appendChild(img);
+    }else{
+      const icon = document.createElement('span');
+      icon.textContent = '📄';
+      chip.appendChild(icon);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'attachment-info';
+
+    const name = document.createElement('div');
+    name.className = 'attachment-name';
+    name.textContent = item.name;
+
+    const status = document.createElement('div');
+    status.className = 'attachment-status';
+    status.textContent = item.status === 'uploading'
+      ? 'جاري الرفع...'
+      : item.status === 'error'
+        ? 'فشل الرفع'
+        : 'تم الرفع ✓ • ' + formatBytes(item.size);
+
+    if(item.status === 'error') status.classList.add('upload-error');
+    if(item.status === 'ready') status.classList.add('upload-success');
+
+    info.append(name, status);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'attachment-remove';
+    remove.textContent = '×';
+    remove.title = 'حذف المرفق';
+    remove.addEventListener('click', function(){
+      const controller = uploadControllers.get(index);
+      if(controller) controller.abort();
+      if(item.previewUrl && item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+      pendingAttachments.splice(index, 1);
+      renderPendingAttachments();
+    });
+
+    chip.append(info, remove);
+    attachmentsPreview.appendChild(chip);
+  });
+}
+
+async function uploadFiles(fileList){
+  const files = Array.from(fileList || []);
+  if(!files.length) return;
+
+  for(const file of files){
+    const localItem = {
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      kind: file.type && file.type.startsWith('image/') ? 'image' : 'file',
+      status: 'uploading',
+      previewUrl: file.type && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+    };
+
+    pendingAttachments.push(localItem);
+    const itemIndex = pendingAttachments.length - 1;
+    renderPendingAttachments();
+
+    const controller = new AbortController();
+    uploadControllers.set(itemIndex, controller);
+
+    try{
+      const formData = new FormData();
+      formData.append('files', file, file.name);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+
+      const data = await response.json().catch(function(){ return {}; });
+
+      if(!response.ok || !Array.isArray(data.attachments) || !data.attachments.length){
+        throw new Error(data.message || 'تعذر رفع الملف.');
+      }
+
+      const uploaded = data.attachments[0];
+      Object.assign(localItem, uploaded, {
+        name: uploaded.name || localItem.name,
+        type: uploaded.type || localItem.type,
+        size: uploaded.size || localItem.size,
+        kind: uploaded.kind || localItem.kind,
+        status: 'ready'
+      });
+
+      if(localItem.kind === 'image' && uploaded.dataUrl){
+        localItem.previewUrl = uploaded.dataUrl;
+      }
+
+      if(localItem.previewUrl && localItem.previewUrl.startsWith('blob:')){
+        URL.revokeObjectURL(localItem.previewUrl);
+      }
+
+      renderPendingAttachments();
+    }catch(error){
+      if(error.name === 'AbortError'){
+        localItem.status = 'error';
+        localItem.error = 'تم إلغاء الرفع.';
+      }else{
+        localItem.status = 'error';
+        localItem.error = error.message || 'تعذر رفع الملف.';
+      }
+      renderPendingAttachments();
+      statusBanner.textContent = '⚠️ ' + localItem.error;
+    }finally{
+      uploadControllers.delete(itemIndex);
+    }
+  }
+}
+
+function openAttachmentMenu(){
+  attachmentMenu.classList.toggle('show');
+}
+
+attachmentBtn.addEventListener('click', function(event){
+  event.stopPropagation();
+  openAttachmentMenu();
+});
+
+chooseFileBtn.addEventListener('click', function(){
+  attachmentMenu.classList.remove('show');
+  fileInput.click();
+});
+
+chooseImageBtn.addEventListener('click', function(){
+  attachmentMenu.classList.remove('show');
+  imageInput.click();
+});
+
+fileInput.addEventListener('change', function(){
+  uploadFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+imageInput.addEventListener('change', function(){
+  uploadFiles(imageInput.files);
+  imageInput.value = '';
+});
+
+document.addEventListener('dragover', function(event){
+  const zone = event.target.closest('.chat-scroll, .input-box');
+  if(!zone) return;
+  if(Array.from(event.dataTransfer?.types || []).includes('Files')){
+    event.preventDefault();
+    inputBox.classList.add('drag-active');
+  }
+});
+
+document.addEventListener('drop', function(event){
+  const zone = event.target.closest('.chat-scroll, .input-box');
+  if(!zone) return;
+  if(Array.from(event.dataTransfer?.types || []).includes('Files')){
+    event.preventDefault();
+    inputBox.classList.remove('drag-active');
+    uploadFiles(event.dataTransfer.files);
+  }
+});
+
+document.addEventListener('dragleave', function(event){
+  if(event.relatedTarget === null) inputBox.classList.remove('drag-active');
+});
+
+document.addEventListener('paste', function(event){
+  const items = Array.from(event.clipboardData?.items || []);
+  const imageItem = items.find(function(item){ return item.type && item.type.startsWith('image/'); });
+  if(!imageItem) return;
+  const file = imageItem.getAsFile();
+  if(file) uploadFiles([file]);
+});
+
+const inputBox = document.querySelector('.input-box');
+
+document.addEventListener('click', function(event){
+  if(!attachmentMenu.contains(event.target) && event.target !== attachmentBtn){
+    attachmentMenu.classList.remove('show');
+  }
+});
+
+
+/* =========================================================
    SEND MESSAGE
 ========================================================= */
 
@@ -2664,9 +3078,28 @@ async function sendMessage(){
   const text =
     ta.value.trim();
 
-  if(!text){
+  const readyAttachments =
+    pendingAttachments.filter(function(item){
+      return item.status === 'ready';
+    });
+
+  const failedAttachments =
+    pendingAttachments.filter(function(item){
+      return item.status === 'error';
+    });
+
+  if(!text && !readyAttachments.length){
 
     ta.focus();
+
+    return;
+
+  }
+
+  if(failedAttachments.length){
+
+    statusBanner.textContent =
+      '⚠️ احذف المرفقات التي فشل رفعها أو أعد رفعها.';
 
     return;
 
@@ -2707,17 +3140,30 @@ async function sendMessage(){
     رسالة المستخدم.
   */
 
-  addUserMessage(text);
+  addUserMessage(text, readyAttachments);
 
   /*
     حفظها.
   */
 
+  const attachmentHistory = readyAttachments.map(function(item){
+    const content = typeof item.content === 'string' ? item.content.slice(0, 18000) : '';
+    return {
+      name: item.name,
+      type: item.type,
+      size: item.size,
+      kind: item.kind,
+      content: content
+    };
+  });
+
   conversationHistory.push({
 
     role:'user',
 
-    content:text
+    content:text,
+
+    attachments:attachmentHistory
 
   });
 
@@ -2745,6 +3191,8 @@ async function sendMessage(){
   ta.value =
     '';
 
+  pendingAttachments = [];
+  attachmentsPreview.replaceChildren();
   resizeTextarea();
 
   generating =
@@ -2776,7 +3224,17 @@ async function sendMessage(){
 
             mode:currentMode,
 
-            history:historyForRequest
+            history:historyForRequest,
+
+            attachments:readyAttachments.map(function(item){
+              return {
+                name:item.name,
+                type:item.type,
+                size:item.size,
+                kind:item.kind,
+                content:typeof item.content === 'string' ? item.content.slice(0,120000) : ''
+              };
+            })
 
           })
 
@@ -2974,6 +3432,12 @@ document
       ta.value =
         '';
 
+      pendingAttachments.forEach(function(item){
+        if(item.previewUrl && item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+      });
+      pendingAttachments = [];
+      attachmentsPreview.replaceChildren();
+
       resizeTextarea();
 
       chatScroll.scrollTop =
@@ -3065,7 +3529,8 @@ function renderSavedConversation(){
       if(item.role === 'user'){
 
         addUserMessage(
-          item.content
+          item.content,
+          item.attachments || []
         );
 
       }
