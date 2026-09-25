@@ -22,3 +22,24 @@ CREATE TABLE IF NOT EXISTS ai_settings (
 );
 INSERT INTO ai_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users (lower(email));
+
+
+-- Persistent CodeMind conversations
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(180) NOT NULL DEFAULT 'محادثة جديدة',
+  mode VARCHAR(40) NOT NULL DEFAULT 'code',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id BIGSERIAL PRIMARY KEY,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('user','assistant')),
+  content TEXT NOT NULL,
+  attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS conversations_user_updated_idx ON conversations(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS conversation_messages_conversation_idx ON conversation_messages(conversation_id, id);
