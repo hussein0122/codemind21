@@ -3467,7 +3467,9 @@ async function sendMessage(){
                 content:typeof item.content === 'string' ? item.content.slice(0,120000) : '',
                 dataUrl:item.kind === 'image' && typeof item.dataUrl === 'string' ? item.dataUrl : ''
               };
-            })
+            }),
+
+            project:window.CodeMindProjectWorkspace?.getCurrentProject?.() || null
 
           })
 
