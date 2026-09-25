@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { isAiConfigured, createCompletion } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
-import { authDatabaseReady, initializeAuth, registerAuthRoutes } from './services/auth.service.js';
+import { authDatabaseReady, checkAuthDatabase, initializeAuth, registerAuthRoutes } from './services/auth.service.js';
 
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -53,10 +53,13 @@ function buildSafeHistory(history = []) {
 
 registerAuthRoutes(app);
 
-app.get('/health', (req, res) => res.json({
-  ok: true,
+app.get('/health', async (req, res) => {
+  const database = await checkAuthDatabase();
+  res.status(database.connected || !database.configured ? 200 : 503).json({
+  ok: database.connected || !database.configured,
   ai: isAiConfigured(),
-  database: authDatabaseReady() ? 'configured' : 'disabled',
+  database: database.connected ? 'connected' : (database.configured ? 'error' : 'disabled'),
+  usersTable: database.usersTable === true,
   memory: 'conversation_context',
   attachments: 'enabled',
   projects: 'enabled',
