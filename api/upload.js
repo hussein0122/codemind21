@@ -22,7 +22,7 @@ function parseMultipart(buffer, boundary) {
     if (buffer.subarray(afterMarker, afterMarker + 2).toString() === '--') break;
 
     const headerStart = afterMarker + 2;
-    const headerEnd = buffer.indexOf(Buffer.from('\\r\\n\\r\\n'), headerStart);
+    const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), headerStart);
     if (headerEnd < 0) break;
     if (headerEnd - headerStart > MAX_HEADER) throw new Error('INVALID_MULTIPART_HEADERS');
 
