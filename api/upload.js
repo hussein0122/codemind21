@@ -33,12 +33,12 @@ function parseMultipart(buffer, boundary) {
     const dataEnd = Math.max(headerEnd + 4, next - 2);
     const data = buffer.subarray(headerEnd + 4, dataEnd);
     const disposition = headers.match(
-      /content-disposition:\s*form-data;[^\\r\\n]*name="([^"]+)"(?:[^\\r\\n]*filename="([^"]*)")?/i
+      /content-disposition:\s*form-data;[^\r\n]*name="([^"]+)"(?:[^\r\n]*filename="([^"]*)")?/i
     );
 
     if (disposition?.[2]) {
       const type =
-        headers.match(/content-type:\s*([^\\r\\n]+)/i)?.[1]?.trim() ||
+        headers.match(/content-type:\s*([^\r\n]+)/i)?.[1]?.trim() ||
         'application/octet-stream';
 
       files.push({
