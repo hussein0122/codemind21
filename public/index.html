@@ -3866,7 +3866,7 @@ resizeTextarea();
 (() => {
   const mic=document.getElementById("micBtn"), call=document.getElementById("voiceCallBtn"), screen=document.getElementById("voiceCallScreen");
   const close=document.getElementById("voiceCallClose"), end=document.getElementById("voiceCallEnd"), mute=document.getElementById("voiceCallMute"), speaker=document.getElementById("voiceCallSpeaker");
-  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu");
+  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu"), plusBtn=document.getElementById("plusBtn"), emojiPicker=document.getElementById("emojiPicker");
   const R=window.SpeechRecognition||window.webkitSpeechRecognition, synth=window.speechSynthesis;
   if(!mic||!ta)return;
   let rec=null,listening=false,base="",finalText="",inCall=false,muted=false,speaking=false,history=[],voice=null;
