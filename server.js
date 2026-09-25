@@ -130,7 +130,7 @@ app.post('/api/chat', async (req, res) => {
 app.get('/', async (req, res, next) => {
   try {
     const html = await readFile(path.join(__dirname, 'public', 'index.html'), 'utf8');
-    const scripts = '<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-x2k3eGq6uZ4k8FQWw1X1fQ1h4qN7v2vYw5vJw9cQ7s6R5P9Gk1hL8mM8Y9H8hQ8gG0f3k2W7r5c4x5n6G7f8A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/project-workspace.js"></script>';
+    const scripts = '<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/project-workspace.js"></script><script src="/account.js"></script>';
     res.type('html').send(html.replace('</body>', `${scripts}</body>`));
   } catch (error) {
     next(error);
