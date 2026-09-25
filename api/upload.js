@@ -1,6 +1,7 @@
 import { validateUpload, uploadLimits, attachmentResult, safeFilename } from '../services/file-upload.service.js';
 
-const MAX_HEADER = 4096;
+const MAX_HEADER = 8192;
+const MAX_MULTIPART_PARTS = 20;
 
 // Keep multipart/form-data as a raw request stream on Vercel.
 // Without this, the platform can consume/parse the body before our multipart parser sees it.
@@ -12,23 +13,45 @@ function parseMultipart(buffer, boundary) {
   const marker = Buffer.from(`--${boundary}`);
   const files = [];
   let offset = 0;
-  while (true) {
+
+  while (offset < buffer.length && files.length < MAX_MULTIPART_PARTS) {
     const start = buffer.indexOf(marker, offset);
     if (start < 0) break;
-    const headerStart = start + marker.length + 2;
-    const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), headerStart);
-    if (headerEnd < 0 || headerEnd - headerStart > MAX_HEADER) break;
+
+    const afterMarker = start + marker.length;
+    if (buffer.subarray(afterMarker, afterMarker + 2).toString() === '--') break;
+
+    const headerStart = afterMarker + 2;
+    const headerEnd = buffer.indexOf(Buffer.from('\\r\\n\\r\\n'), headerStart);
+    if (headerEnd < 0) break;
+    if (headerEnd - headerStart > MAX_HEADER) throw new Error('INVALID_MULTIPART_HEADERS');
+
     const headers = buffer.subarray(headerStart, headerEnd).toString('utf8');
     const next = buffer.indexOf(marker, headerEnd + 4);
     if (next < 0) break;
-    const data = buffer.subarray(headerEnd + 4, Math.max(headerEnd + 4, next - 2));
-    const disposition = headers.match(/content-disposition:\s*form-data;[^\r\n]*name="([^"]+)"[^\r\n]*(?:filename="([^"]*)")?/i);
+
+    const dataEnd = Math.max(headerEnd + 4, next - 2);
+    const data = buffer.subarray(headerEnd + 4, dataEnd);
+    const disposition = headers.match(
+      /content-disposition:\s*form-data;[^\\r\\n]*name="([^"]+)"(?:[^\\r\\n]*filename="([^"]*)")?/i
+    );
+
     if (disposition?.[2]) {
-      const type = headers.match(/content-type:\s*([^\r\n]+)/i)?.[1]?.trim() || 'application/octet-stream';
-      files.push({ field: disposition[1], filename: safeFilename(disposition[2]), contentType: type, data });
+      const type =
+        headers.match(/content-type:\s*([^\\r\\n]+)/i)?.[1]?.trim() ||
+        'application/octet-stream';
+
+      files.push({
+        field: disposition[1],
+        filename: safeFilename(disposition[2]),
+        contentType: type,
+        data
+      });
     }
-    offset = next + marker.length;
+
+    offset = next;
   }
+
   return files;
 }
 
@@ -70,6 +93,7 @@ export default async function upload(req, res) {
     return res.json({ attachments: result });
   } catch (error) {
     const messages = {
+      INVALID_MULTIPART_HEADERS: 'بيانات رفع الملف غير صالحة.',
       FILE_TOO_LARGE: 'حجم الملف أكبر من الحد المسموح.', UNSUPPORTED_FILE_TYPE: 'نوع الملف غير مدعوم.',
       UNSAFE_FILE_TYPE: 'هذا النوع من الملفات غير مسموح به.', INVALID_IMAGE: 'الصورة غير صالحة.', INVALID_ZIP: 'ملف ZIP غير صالح.'
     };
