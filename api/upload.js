@@ -2,6 +2,12 @@ import { validateUpload, uploadLimits, attachmentResult, safeFilename } from '..
 
 const MAX_HEADER = 4096;
 
+// Keep multipart/form-data as a raw request stream on Vercel.
+// Without this, the platform can consume/parse the body before our multipart parser sees it.
+export const config = {
+  api: { bodyParser: false }
+};
+
 function parseMultipart(buffer, boundary) {
   const marker = Buffer.from(`--${boundary}`);
   const files = [];
