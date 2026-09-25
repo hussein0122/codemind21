@@ -3022,6 +3022,36 @@ function renderPendingAttachments(){
   });
 }
 
+async function prepareImageForAI(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return '';
+  try{
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    let quality = 0.82;
+    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+    while(dataUrl.length > 2100000 && quality > 0.45){
+      quality -= 0.08;
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+    return dataUrl.length <= 2300000 ? dataUrl : '';
+  }catch(error){
+    console.warn('AI image preparation failed:', error);
+    return '';
+  }
+}
+
 async function uploadFiles(fileList){
   const files = Array.from(fileList || []);
   if(!files.length) return;
@@ -3044,6 +3074,12 @@ async function uploadFiles(fileList){
     uploadControllers.set(itemIndex, controller);
 
     try{
+      if(localItem.kind === 'image'){
+        localItem.dataUrl = await prepareImageForAI(file);
+        if(!localItem.dataUrl){
+          throw new Error('تعذر تجهيز الصورة للتحليل. جرّب صورة أصغر.');
+        }
+      }
       const formData = new FormData();
       formData.append('files', file, file.name);
 
