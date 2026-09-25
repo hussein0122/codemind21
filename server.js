@@ -34,7 +34,7 @@ const MAX_UPLOAD_HEADER = 8192;
 const MAX_MULTIPART_PARTS = 20;
 
 function parseMultipart(buffer, boundary) {
-  const marker = Buffer.from(`--${boundary}`);
+  const marker = Buffer.from(\`--\${boundary}\`);
   const files = [];
   let offset = 0;
 
@@ -44,7 +44,7 @@ function parseMultipart(buffer, boundary) {
     const afterMarker = start + marker.length;
     if (buffer.subarray(afterMarker, afterMarker + 2).toString() === '--') break;
     const headerStart = afterMarker + 2;
-    const headerEnd = buffer.indexOf(Buffer.from('[^\r\n]*r[^\r\n]*n[^\r\n]*r[^\r\n]*n'), headerStart);
+    const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), headerStart);
     if (headerEnd < 0) break;
     if (headerEnd - headerStart > MAX_UPLOAD_HEADER) throw new Error('INVALID_MULTIPART_HEADERS');
     const headers = buffer.subarray(headerStart, headerEnd).toString('utf8');
@@ -52,9 +52,9 @@ function parseMultipart(buffer, boundary) {
     if (next < 0) break;
     const dataEnd = Math.max(headerEnd + 4, next - 2);
     const data = buffer.subarray(headerEnd + 4, dataEnd);
-    const disposition = headers.match(/content-disposition:\s*form-data;[^[^\r\n]*r[^\r\n]*n]*name="([^"]+)"(?:[^[^\r\n]*r[^\r\n]*n]*filename="([^"]*)")?/i);
+    const disposition = headers.match(/content-disposition:\s*form-data;[^\r\n]*name="([^"]+)"(?:[^\r\n]*filename="([^"]*)")?/i);
     if (disposition?.[2]) {
-      const type = headers.match(/content-type:[^\r\n]*s*([^[^\r\n]*r[^\r\n]*n]+)/i)?.[1]?.trim() || 'application/octet-stream';
+      const type = headers.match(/content-type:\s*([^\r\n]+)/i)?.[1]?.trim() || 'application/octet-stream';
       files.push({ field: disposition[1], filename: safeFilename(disposition[2]), contentType: type, data });
     }
     offset = next;
@@ -63,11 +63,11 @@ function parseMultipart(buffer, boundary) {
 }
 
 app.post('/api/upload',
-  express.raw({ type: /^multipart[^\r\n]*/form-data(?:;|$)/i, limit: '15mb' }),
+  express.raw({ type: /^multipart\/form-data(?:;|$)/i, limit: '15mb' }),
   async (req, res) => {
     const limits = uploadLimits();
     const contentType = String(req.headers['content-type'] || '');
-    const match = contentType.match(/multipart[^\r\n]*/form-data;[^\r\n]*s*boundary=(?:"([^"]+)"|([^;]+))/i);
+    const match = contentType.match(/multipart\/form-data;\s*boundary=(?:"([^"]+)"|([^;]+))/i);
     if (!match) return res.status(415).json({ error: 'multipart_required', message: 'أرسل الملفات بصيغة multipart/form-data.' });
     const length = Number(req.headers['content-length'] || 0);
     if (length > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
