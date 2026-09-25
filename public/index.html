@@ -1471,6 +1471,26 @@ button{
 </div>
 
 <script>
+(() => {
+  const plus = document.getElementById('plusBtn');
+  const menu = document.getElementById('attachmentMenu');
+  const emoji = document.getElementById('emojiPicker');
+  if (!plus || !menu) return;
+  plus.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    menu.classList.toggle('show');
+    emoji?.classList.remove('show');
+  });
+  document.addEventListener('click', (event) => {
+    if (!menu.contains(event.target) && event.target !== plus) {
+      menu.classList.remove('show');
+    }
+  });
+})();
+</script>
+
+<script>
 /* =========================================================
    MEMORY
 ========================================================= */
@@ -2630,7 +2650,7 @@ function addProjectCard(
         const name =
           typeof file === 'string'
             ? file
-            : file.name;
+            : (file.path || file.name);
 
         if(!name){
           return;
@@ -2883,9 +2903,19 @@ async function showAiResponse(
 
   if(project){
 
-    addProjectCard(
-      message,
-      project
+    if(window.CodeMindProjectWorkspace?.render){
+      window.CodeMindProjectWorkspace.render(project);
+    }else{
+      addProjectCard(
+        message,
+        project
+      );
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('codemind:project',{
+        detail:project
+      })
     );
 
   }
@@ -3170,11 +3200,6 @@ async function uploadFiles(fileList){
 function openAttachmentMenu(){
   attachmentMenu.classList.toggle('show');
 }
-
-plusBtn.addEventListener('click', function(event){
-  event.stopPropagation();
-  openAttachmentMenu();
-});
 
 cameraBtn.addEventListener('click', function(){
   attachmentMenu.classList.remove('show');
