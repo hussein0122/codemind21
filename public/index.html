@@ -2738,9 +2738,12 @@ async function typeAiResponse(
       '<span class="typing-cursor"></span>';
 
     /*
-      لا نعمل scroll هنا.
-      المستخدم يظل في مكانه.
+      نتابع رد الـAI تلقائيًا أثناء الكتابة
+      حتى يظل آخر جزء من الرد ظاهرًا بدون
+      أن يضطر المستخدم للنزول يدويًا.
     */
+    chatScroll.scrollTop =
+      chatScroll.scrollHeight;
 
     await new Promise(
       function(resolve){
@@ -2847,15 +2850,13 @@ function showAiError(message){
 
 
 /* =========================================================
-   NO AUTO SCROLL
+   CHAT SCROLL
 ========================================================= */
 
 /*
-  مهم:
-  لا يوجد هنا scrollToBottom().
-  الشات لن ينزلك تلقائيًا أثناء الرد.
+  نستخدم auto-scroll أثناء رد الـAI فقط،
+  حتى يظل آخر جزء من الرد ظاهرًا.
 */
-
 function isNearBottom(){
 
   const distance =
@@ -3364,6 +3365,12 @@ async function sendMessage(){
       data.generatedProject ||
       null
     );
+
+    /*
+      نخلي آخر جزء من رد الـAI ظاهرًا بعد انتهاء الكتابة.
+    */
+    chatScroll.scrollTop =
+      chatScroll.scrollHeight;
 
     /*
       حفظ رد AI.
