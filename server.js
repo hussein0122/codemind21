@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { isAiConfigured, createCompletion } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
+import { authDatabaseReady, initializeAuth, registerAuthRoutes } from './services/auth.service.js';
 
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,13 @@ if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: '4mb' }));
+app.use((req, res, next) => {
+  req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(part => part.trim()).filter(Boolean).map(part => {
+    const index = part.indexOf('=');
+    return index < 0 ? [part, ''] : [decodeURIComponent(part.slice(0, index)), decodeURIComponent(part.slice(index + 1))];
+  }));
+  next();
+});
 app.use('/api', rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60000),
   limit: Number(process.env.RATE_LIMIT_MAX || 60),
@@ -43,10 +51,12 @@ function buildSafeHistory(history = []) {
   return safe.reverse();
 }
 
+registerAuthRoutes(app);
+
 app.get('/health', (req, res) => res.json({
   ok: true,
   ai: isAiConfigured(),
-  database: 'disabled',
+  database: authDatabaseReady() ? 'configured' : 'disabled',
   memory: 'conversation_context',
   attachments: 'enabled',
   projects: 'enabled',
@@ -133,5 +143,10 @@ app.use((error, req, res, next) => {
   return res.status(500).json({ error: 'internal_error', message: 'حدث خطأ داخلي.' });
 });
 
-if (!process.env.VERCEL) app.listen(port, () => console.log(`CodeMind AI backend running on http://localhost:${port}`));
+if (!process.env.VERCEL) {
+  initializeAuth().then(() => app.listen(port, () => console.log(`CodeMind AI backend running on http://localhost:${port}`)))
+    .catch(error => { console.error('Auth/database initialization failed:', error.message); process.exitCode = 1; });
+} else {
+  initializeAuth().catch(error => console.error('Auth/database initialization failed:', error.message));
+}
 export default app;
