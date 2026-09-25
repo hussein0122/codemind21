@@ -820,7 +820,8 @@ button{
   border:1px solid var(--border2);
   border-radius:12px;
   box-shadow:0 18px 50px rgba(0,0,0,.4);
-  z-index:60;
+  z-index:2000;
+  pointer-events:auto;
 }
 
 .attachment-menu.show{
@@ -2135,71 +2136,11 @@ ta.addEventListener(
 /* =========================================================
    VOICE INPUT
 ========================================================= */
-
-let speechRecognition = null;
-let isListening = false;
-
-function setupVoiceInput(){
-
-  const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-  if(!SpeechRecognition){
-    micBtn.title = 'التحدث غير مدعوم في هذا المتصفح';
-    return;
-  }
-
-  speechRecognition = new SpeechRecognition();
-  speechRecognition.lang = 'ar-EG';
-  speechRecognition.continuous = false;
-  speechRecognition.interimResults = true;
-
-  speechRecognition.onstart = function(){
-    isListening = true;
-    micBtn.classList.add('recording');
-    statusBanner.textContent = '🎙️ استمع إليك...';
-  };
-
-  speechRecognition.onresult = function(event){
-    let transcript = '';
-    for(let i = event.resultIndex; i < event.results.length; i++){
-      transcript += event.results[i][0].transcript;
-    }
-    if(transcript.trim()){
-      ta.value = transcript.trim();
-      resizeTextarea();
-    }
-  };
-
-  speechRecognition.onerror = function(event){
-    statusBanner.textContent =
-      event.error === 'not-allowed'
-        ? '⚠️ اسمح للموقع باستخدام الميكروفون.'
-        : '⚠️ تعذر استخدام الميكروفون.';
-  };
-
-  speechRecognition.onend = function(){
-    isListening = false;
-    micBtn.classList.remove('recording');
-  };
-
-  micBtn.addEventListener('click', function(){
-    if(isListening){
-      speechRecognition.stop();
-      return;
-    }
-
-    try{
-      speechRecognition.start();
-    }catch(error){
-      console.error('Voice input error:', error);
-    }
-  });
-}
-
-setupVoiceInput();
-
+/*
+  تحويل الصوت للنص يتم من خلال MediaRecorder -> /api/transcribe -> Whisper.
+  لا نستخدم SpeechRecognition هنا حتى لا تتكرر الـ interim/final results
+  أو يتم ربط أكثر من handler بنفس زر الميكروفون.
+*/
 
 /* =========================================================
    EMOJI
@@ -4096,7 +4037,11 @@ resizeTextarea();
     finalText="";
 
     const started=await startMediaRecording();
-    if(!started)startBrowserRecognition();
+    if(!started){
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        statusBanner.textContent="⚠️ تعذر تشغيل تسجيل الميكروفون. اسمح بالميكروفون من إعدادات الموقع ثم جرّب مرة أخرى.";
+      }
+    }
   });
 
 })();
