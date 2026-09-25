@@ -2738,12 +2738,14 @@ async function typeAiResponse(
       '<span class="typing-cursor"></span>';
 
     /*
-      نتابع رد الـAI تلقائيًا أثناء الكتابة
-      حتى يظل آخر جزء من الرد ظاهرًا بدون
-      أن يضطر المستخدم للنزول يدويًا.
+      ننزل بالشات مرة واحدة فقط عند أول حرف
+      من رد الـAI، لتنبيه المستخدم أن الرد بدأ.
+      بعد ذلك لا نعمل auto-scroll أثناء الكتابة.
     */
-    chatScroll.scrollTop =
-      chatScroll.scrollHeight;
+    if(index === chunkSize){
+      chatScroll.scrollTop =
+        chatScroll.scrollHeight;
+    }
 
     await new Promise(
       function(resolve){
@@ -3367,10 +3369,9 @@ async function sendMessage(){
     );
 
     /*
-      نخلي آخر جزء من رد الـAI ظاهرًا بعد انتهاء الكتابة.
+      لا نعمل auto-scroll بعد انتهاء الرد؛
+      النزول التلقائي حصل مرة واحدة عند أول حرف.
     */
-    chatScroll.scrollTop =
-      chatScroll.scrollHeight;
 
     /*
       حفظ رد AI.
