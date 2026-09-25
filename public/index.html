@@ -3936,16 +3936,131 @@ resizeTextarea();
   if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
   if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم");orbState("");}else listenCall();});
   if(speaker)speaker.addEventListener("click",()=>{if(synth&&synth.speaking){synth.cancel();speaking=false;orbState("");callState("جاهز","اتكلم تاني");setTimeout(listenCall,250);}});
-  mic.addEventListener("click",()=>{
-    if(inCall||!R)return;
-    if(listening){stopRec();if(finalText.trim())ta.value=[base,finalText.trim()].filter(Boolean).join(" ");finalText="";ta.dispatchEvent(new Event("input",{bubbles:true}));return;}
-    base=ta.value.trim();finalText="";rec=new R();rec.lang="ar-EG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+  let mediaRecorder=null;
+  let mediaChunks=[];
+  let mediaStream=null;
+  let mediaTimer=null;
+
+  function insertTranscript(text){
+    const cleaned=String(text||"").trim();
+    if(!cleaned)return;
+    ta.value=[base,cleaned].filter(Boolean).join(" ");
+    ta.dispatchEvent(new Event("input",{bubbles:true}));
+    ta.focus();
+  }
+
+  async function transcribeRecordedAudio(blob){
+    if(!blob || !blob.size) return;
+    if(typeof statusBanner!=="undefined" && statusBanner){
+      statusBanner.textContent="🧠 بحوّل صوتك لنص بدقة...";
+    }
+    try{
+      const response=await fetch("/api/transcribe",{
+        method:"POST",
+        headers:{"Content-Type":blob.type||"audio/webm"},
+        body:blob
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.message||"transcription_failed");
+      insertTranscript(data.text||"");
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="";
+    }catch(error){
+      console.error("Whisper transcription failed:",error);
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        statusBanner.textContent="⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
+      }
+    }finally{
+      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
+      mediaStream=null;
+    }
+  }
+
+  function stopMediaRecording(){
+    if(mediaTimer){clearTimeout(mediaTimer);mediaTimer=null;}
+    try{mediaRecorder?.stop()}catch{}
+  }
+
+  async function startMediaRecording(){
+    if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)return false;
+    try{
+      mediaStream=await navigator.mediaDevices.getUserMedia({audio:{
+        channelCount:1,
+        echoCancellation:true,
+        noiseSuppression:true,
+        autoGainControl:true
+      }});
+      const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(type=>MediaRecorder.isTypeSupported(type));
+      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred}:undefined);
+      mediaChunks=[];
+      mediaRecorder.ondataavailable=(event)=>{if(event.data?.size)mediaChunks.push(event.data)};
+      mediaRecorder.onstop=()=>{
+        const blob=new Blob(mediaChunks,{type:mediaRecorder?.mimeType||"audio/webm"});
+        mediaChunks=[];
+        void transcribeRecordedAudio(blob);
+      };
+      mediaRecorder.start();
+      micState(true);
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اضغط الميك مرة ثانية لما تخلص.";
+      mediaTimer=setTimeout(stopMediaRecording,15000);
+      return true;
+    }catch(error){
+      console.warn("MediaRecorder microphone unavailable:",error);
+      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
+      mediaStream=null;
+      return false;
+    }
+  }
+
+  function startBrowserRecognition(){
+    if(!R){
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="⚠️ المتصفح لا يدعم التسجيل الصوتي.";
+      return;
+    }
+    rec=new R();
+    rec.lang="ar-EG";
+    rec.continuous=true;
+    rec.interimResults=true;
+    rec.maxAlternatives=3;
     rec.onstart=()=>{listening=true;micState(true);};
-    rec.onresult=e=>{let f="",i="";for(let n=e.resultIndex;n<e.results.length;n++){const t=e.results[n][0].transcript||"";if(e.results[n].isFinal)f+=t;else i+=t;}if(f)finalText+=f;ta.value=[base,finalText.trim(),i.trim()].filter(Boolean).join(" ");ta.dispatchEvent(new Event("input",{bubbles:true}));};
+    rec.onresult=e=>{
+      let f="",i="";
+      for(let n=e.resultIndex;n<e.results.length;n++){
+        const result=e.results[n];
+        const t=result?.[0]?.transcript||"";
+        if(result.isFinal)f+=t;else i+=t;
+      }
+      if(f)finalText+=f;
+      ta.value=[base,finalText.trim(),i.trim()].filter(Boolean).join(" ");
+      ta.dispatchEvent(new Event("input",{bubbles:true}));
+    };
     rec.onerror=()=>{stopRec();};
-    rec.onend=()=>{listening=false;micState(false);if(finalText.trim())ta.value=[base,finalText.trim()].filter(Boolean).join(" ");finalText="";ta.dispatchEvent(new Event("input",{bubbles:true}));};
-    try{rec.start()}catch(e){}
+    rec.onend=()=>{listening=false;micState(false);};
+    try{rec.start()}catch{}
+  }
+
+  mic.addEventListener("click",async()=>{
+    if(inCall)return;
+
+    if(mediaRecorder && mediaRecorder.state==="recording"){
+      stopMediaRecording();
+      micState(false);
+      return;
+    }
+
+    if(listening){
+      stopRec();
+      if(finalText.trim())insertTranscript(finalText);
+      finalText="";
+      return;
+    }
+
+    base=ta.value.trim();
+    finalText="";
+
+    const started=await startMediaRecording();
+    if(!started)startBrowserRecognition();
   });
+
 })();
 </script>
 </body>
