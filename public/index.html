@@ -3086,6 +3086,13 @@ async function uploadFiles(fileList){
       if(localItem.kind === 'image'){
         localItem.status = 'ready';
         renderPendingAttachments();
+      }else if(/^(text\/|application\/json$|application\/javascript$|application\/x-javascript$)/i.test(localItem.type) || /\.(txt|json|js|jsx|ts|tsx|html|css|scss|php|py|java|cpp|c|cs|go|rs|dart|sql|xml|ya?ml|md|log)$/i.test(localItem.name)){
+        if(localItem.size > 2 * 1024 * 1024){
+          throw new Error('الملف النصي أكبر من 2MB.');
+        }
+        localItem.content = (await file.text()).slice(0, 2 * 1024 * 1024);
+        localItem.status = 'ready';
+        renderPendingAttachments();
       }else{
         const formData = new FormData();
         formData.append('files', file, file.name);
