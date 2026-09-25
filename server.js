@@ -146,7 +146,7 @@ app.post('/api/transcribe',
         buffer: audio,
         mimeType: String(req.headers['content-type'] || 'audio/webm').split(';')[0],
         filename: 'codemind-voice.webm',
-        prompt: 'اللهجة المصرية والعربية. اكتب الكلام كما قيل مع الحفاظ على أسماء البرمجة والتقنية مثل CodeMind و JavaScript و React و Node.js و API و Supabase و PostgreSQL.'
+        prompt: 'اللهجة المصرية والعربية المصرية. اكتب ما سمعته فقط وبنفس ترتيب الكلام. لا تكرر أي كلمة أو مقطع أو جملة بسبب تكرار التعرف الصوتي. لا تضف كلمات من عندك ولا تكمل الجملة بالتخمين. لا تحوّل العامية إلى فصحى. حافظ على أسماء البرمجة والتقنية مثل CodeMind و JavaScript و React و Node.js و API و Supabase و PostgreSQL.'
       });
       return res.json({ text: String(transcript || '').trim() });
     } catch (error) {
