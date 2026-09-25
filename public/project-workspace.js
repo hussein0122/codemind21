@@ -3,8 +3,9 @@
   'use strict';
 
   const STORAGE_KEY = 'codemind.projects.v1';
-  const MAX_PROJECTS = 5;
-  const MAX_BYTES = 2 * 1024 * 1024;
+  const MAX_PROJECTS = 8;
+  const MAX_FILES = 220;
+  const MAX_BYTES = 15 * 1024 * 1024;
   let currentProject = null;
 
   const escapeText = (value) => String(value ?? '');
@@ -22,7 +23,7 @@
     saved.unshift({
       name: String(project.name || 'codemind-project').slice(0, 80),
       description: String(project.description || '').slice(0, 1000),
-      files: project.files.slice(0, 60).map((file) => ({
+      files: project.files.slice(0, MAX_FILES).map((file) => ({
         path: String(file.path || '').slice(0, 500),
         content: String(file.content || '')
       })),
