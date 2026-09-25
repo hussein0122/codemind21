@@ -30,7 +30,17 @@ export async function transcribeAudio({ buffer, mimeType = 'audio/webm', filenam
     response_format: 'json',
     temperature: 0
   });
-  return result?.text || '';
+  let text = String(result?.text || '').trim();
+
+  // Whisper can occasionally repeat an adjacent word/phrase in noisy speech.
+  // Remove only very obvious duplicated runs; do not aggressively rewrite the transcript.
+  text = text
+    .replace(/([\u0600-\u06FF]{2,24})\1(?=\s|$)/gu, '$1')
+    .replace(/(\b[^\s]{2,24}(?:\s+[^\s]{2,24}){0,5})\s+\1(?=\s|$)/giu, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return text;
 }
 
 export async function createCompletion({ messages, mode, structured = false, imageAttachments = [] }) {
