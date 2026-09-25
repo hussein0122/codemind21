@@ -15,6 +15,16 @@ const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const secret = () => process.env.AUTH_SECRET || '';
 
 export function authDatabaseReady() { return Boolean(pool); }
+export async function checkAuthDatabase() {
+  if (!pool) return { configured: false, connected: false, message: 'DATABASE_URL غير موجود.' };
+  try {
+    await pool.query('SELECT 1');
+    const { rows } = await pool.query("SELECT to_regclass('public.users') AS users_table");
+    return { configured: true, connected: true, usersTable: Boolean(rows[0]?.users_table) };
+  } catch (error) {
+    return { configured: true, connected: false, message: error?.message || 'تعذر الاتصال بقاعدة البيانات.' };
+  }
+}
 export async function getAiSettings() {
   if (!pool) return null;
   try {
@@ -98,14 +108,22 @@ function readToken(token) {
     return data;
   } catch { return null; }
 }
+function cookieHeader(value, maxAge) {
+  const parts = [
+    `${COOKIE_NAME}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAge}`
+  ];
+  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  return parts.join('; ');
+}
 function setSession(res, user) {
-  res.cookie(COOKIE_NAME, makeToken(user), {
-    httpOnly: true, secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', path: '/', maxAge: SESSION_SECONDS * 1000
-  });
+  res.setHeader('Set-Cookie', cookieHeader(makeToken(user), SESSION_SECONDS));
 }
 export function clearSession(res) {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+  res.setHeader('Set-Cookie', cookieHeader('', 0));
 }
 export async function requireAuth(req, res, next) {
   if (!pool) return res.status(503).json({ error: 'database_not_configured', message: 'قاعدة البيانات غير مفعّلة.' });
