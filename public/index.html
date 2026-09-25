@@ -2738,16 +2738,29 @@ async function typeAiResponse(
       '<span class="typing-cursor"></span>';
 
     /*
-      نخلي الشاشة تتابع بداية رد الـAI تلقائيًا أثناء الكتابة.
-      استخدام scrollIntoView على نص الرد نفسه يحرّك
-      منطقة الشات الفعلية، وليس مجرد قيمة شريط الـscroll.
+      Auto-follow حقيقي أثناء كتابة الـAI:
+      لو آخر سطر من الرد وصل تحت الشاشة، نحرك
+      منطقة الشات بنفس مقدار الجزء الخارج منها.
+      كده الشاشة تفضل متابعة البوت مهما طال الرد.
     */
     requestAnimationFrame(function(){
-      textElement.scrollIntoView({
-        behavior: 'auto',
-        block: 'start',
-        inline: 'nearest'
-      });
+      const chatRect =
+        chatScroll.getBoundingClientRect();
+
+      const textRect =
+        textElement.getBoundingClientRect();
+
+      const bottomPadding = 24;
+      const visibleBottom =
+        chatRect.bottom - bottomPadding;
+
+      if(textRect.bottom > visibleBottom){
+        const neededScroll =
+          textRect.bottom - visibleBottom;
+
+        chatScroll.scrollTop +=
+          neededScroll;
+      }
     });
 
     await new Promise(
