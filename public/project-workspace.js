@@ -164,6 +164,6 @@
     dialog.addEventListener('close', () => dialog.remove(), { once: true });
   }
 
-  window.CodeMindProjectWorkspace = { render, saveProject, downloadZip };
+  window.CodeMindProjectWorkspace = { render, saveProject, downloadZip, getCurrentProject: () => currentProject };
   window.addEventListener('codemind:project', (event) => render(event.detail));
 })();
