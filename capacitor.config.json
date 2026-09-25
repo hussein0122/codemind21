@@ -3,7 +3,7 @@
   "appName": "CodeMind AI",
   "webDir": "public",
   "server": {
-    "url": "https://codemind21.vercel.app",
+    "url": "https://codemind21-8wnt.vercel.app",
     "cleartext": false
   },
   "android": {
