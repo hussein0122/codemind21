@@ -3866,7 +3866,7 @@ resizeTextarea();
 (() => {
   const mic=document.getElementById("micBtn"), call=document.getElementById("voiceCallBtn"), screen=document.getElementById("voiceCallScreen");
   const close=document.getElementById("voiceCallClose"), end=document.getElementById("voiceCallEnd"), mute=document.getElementById("voiceCallMute"), speaker=document.getElementById("voiceCallSpeaker");
-  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu"), plusBtn=document.getElementById("plusBtn"), emojiPicker=document.getElementById("emojiPicker");
+  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu");
   const R=window.SpeechRecognition||window.webkitSpeechRecognition, synth=window.speechSynthesis;
   if(!mic||!ta)return;
   let rec=null,listening=false,base="",finalText="",inCall=false,muted=false,speaking=false,history=[],voice=null;
@@ -3907,7 +3907,6 @@ resizeTextarea();
   }
   function openCall(){inCall=true;muted=false;history=[];screen.classList.add("open");screen.setAttribute("aria-hidden","false");callState("المكالمة بدأت","اتكلم مع CodeMind");listenCall();}
   function closeCall(){inCall=false;stopRec();try{if(synth)synth.cancel()}catch(e){}screen.classList.remove("open");screen.setAttribute("aria-hidden","true");orbState("");}
-  if(plusBtn){plusBtn.addEventListener("click",function(e){e.stopPropagation();if(menu)menu.classList.toggle("show");if(emojiPicker)emojiPicker.classList.remove("show");});}
   if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall();});
   if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
   if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم");orbState("");}else listenCall();});
