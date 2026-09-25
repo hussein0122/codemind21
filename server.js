@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import archiver from 'archiver';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
@@ -10,6 +11,7 @@ import { isAiConfigured, createCompletion } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
 import { authDatabaseReady, checkAuthDatabase, initializeAuth, registerAuthRoutes } from './services/auth.service.js';
+import { validateUpload, uploadLimits, attachmentResult, safeFilename } from './services/file-upload.service.js';
 
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +29,71 @@ app.use((req, res, next) => {
   }));
   next();
 });
+
+const MAX_UPLOAD_HEADER = 8192;
+const MAX_MULTIPART_PARTS = 20;
+
+function parseMultipart(buffer, boundary) {
+  const marker = Buffer.from(`--${boundary}`);
+  const files = [];
+  let offset = 0;
+
+  while (offset < buffer.length && files.length < MAX_MULTIPART_PARTS) {
+    const start = buffer.indexOf(marker, offset);
+    if (start < 0) break;
+    const afterMarker = start + marker.length;
+    if (buffer.subarray(afterMarker, afterMarker + 2).toString() === '--') break;
+    const headerStart = afterMarker + 2;
+    const headerEnd = buffer.indexOf(Buffer.from('\\r\\n\\r\\n'), headerStart);
+    if (headerEnd < 0) break;
+    if (headerEnd - headerStart > MAX_UPLOAD_HEADER) throw new Error('INVALID_MULTIPART_HEADERS');
+    const headers = buffer.subarray(headerStart, headerEnd).toString('utf8');
+    const next = buffer.indexOf(marker, headerEnd + 4);
+    if (next < 0) break;
+    const dataEnd = Math.max(headerEnd + 4, next - 2);
+    const data = buffer.subarray(headerEnd + 4, dataEnd);
+    const disposition = headers.match(/content-disposition:\\s*form-data;[^\\r\\n]*name="([^"]+)"(?:[^\\r\\n]*filename="([^"]*)")?/i);
+    if (disposition?.[2]) {
+      const type = headers.match(/content-type:\\s*([^\\r\\n]+)/i)?.[1]?.trim() || 'application/octet-stream';
+      files.push({ field: disposition[1], filename: safeFilename(disposition[2]), contentType: type, data });
+    }
+    offset = next;
+  }
+  return files;
+}
+
+app.post('/api/upload',
+  express.raw({ type: /^multipart\\/form-data(?:;|$)/i, limit: '15mb' }),
+  async (req, res) => {
+    const limits = uploadLimits();
+    const contentType = String(req.headers['content-type'] || '');
+    const match = contentType.match(/multipart\\/form-data;\\s*boundary=(?:"([^"]+)"|([^;]+))/i);
+    if (!match) return res.status(415).json({ error: 'multipart_required', message: 'أرسل الملفات بصيغة multipart/form-data.' });
+    const length = Number(req.headers['content-length'] || 0);
+    if (length > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
+    try {
+      const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+      if (raw.length > limits.maxRequestSize) return res.status(413).json({ error: 'request_too_large', message: 'حجم الطلب أكبر من الحد المسموح.' });
+      const files = parseMultipart(raw, match[1] || match[2]);
+      if (!files.length) return res.status(400).json({ error: 'no_files', message: 'لم يتم إرسال أي ملف.' });
+      if (files.length > limits.maxFiles) return res.status(413).json({ error: 'too_many_files', message: 'عدد الملفات أكبر من الحد المسموح.' });
+      const result = files.map((file) => { validateUpload(file, limits); return attachmentResult(file); });
+      return res.json({ attachments: result });
+    } catch (error) {
+      const messages = {
+        INVALID_MULTIPART_HEADERS: 'بيانات رفع الملف غير صالحة.',
+        FILE_TOO_LARGE: 'حجم الملف أكبر من الحد المسموح.',
+        UNSUPPORTED_FILE_TYPE: 'نوع الملف غير مدعوم.',
+        UNSAFE_FILE_TYPE: 'هذا النوع من الملفات غير مسموح به.',
+        INVALID_IMAGE: 'الصورة غير صالحة.',
+        INVALID_ZIP: 'ملف ZIP غير صالح.'
+      };
+      console.error('Upload validation failed:', error);
+      return res.status(400).json({ error: error.message || 'upload_failed', message: messages[error.message] || 'تعذر رفع الملف.' });
+    }
+  }
+);
+
 app.use('/api', rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60000),
   limit: Number(process.env.RATE_LIMIT_MAX || 60),
@@ -65,6 +132,41 @@ app.get('/health', async (req, res) => {
   projects: 'enabled',
   zip: 'browser_jszip'
 }));
+
+
+app.post('/api/project-zip', express.json({ limit: '7mb' }), (req, res) => {
+  const input = req.body;
+  if (!input || !Array.isArray(input.files)) {
+    return res.status(400).json({ error: 'invalid_project', message: 'بيانات المشروع غير صحيحة.' });
+  }
+  const files = input.files.slice(0, 60)
+    .filter((file) => file && typeof file.content === 'string')
+    .map((file) => ({
+      path: String(file.path || '').replace(/\\\\/g, '/').split('/').filter((part) => part && part !== '.' && part !== '..').join('/'),
+      content: file.content
+    }))
+    .filter((file) => file.path);
+  const size = files.reduce((total, file) => total + Buffer.byteLength(file.content, 'utf8'), 0);
+  if (!files.length || size > 5 * 1024 * 1024) {
+    return res.status(400).json({ error: 'invalid_project', message: 'بيانات المشروع غير صحيحة أو تتجاوز الحد المسموح.' });
+  }
+  const projectName = String(input.name || 'codemind-project').replace(/[^a-zA-Z0-9_\\-\u0600-\u06FF ]/g, '').trim().slice(0, 80) || 'codemind-project';
+  const safeFileName = projectName.replace(/[^a-zA-Z0-9_\\-\u0600-\u06FF]+/g, '-') || 'codemind-project';
+  res.status(200).set({
+    'Content-Type': 'application/zip',
+    'Content-Disposition': `attachment; filename="${safeFileName}.zip"`,
+    'Cache-Control': 'no-store'
+  });
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', (error) => {
+    console.error('Project ZIP stream failed:', error);
+    if (!res.headersSent) res.status(500);
+    res.end();
+  });
+  archive.pipe(res);
+  for (const file of files) archive.append(file.content, { name: `${projectName}/${file.path}` });
+  archive.finalize();
+});
 
 app.post('/api/chat', async (req, res) => {
   try {
