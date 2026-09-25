@@ -822,7 +822,9 @@ button{
 }
 
 .attachment-menu.show{
-  display:flex;
+  display:flex !important;
+  visibility:visible;
+  opacity:1;
 }
 
 .attachment-option{
@@ -1412,7 +1414,8 @@ button{
               id="plusBtn"
               type="button"
               title="إضافة مرفق"
-              aria-label="إضافة مرفق">
+              aria-label="إضافة مرفق"
+              aria-expanded="false">
               <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5v14M5 12h14"></path>
               </svg>
@@ -1470,25 +1473,7 @@ button{
 
 </div>
 
-<script>
-(() => {
-  const plus = document.getElementById('plusBtn');
-  const menu = document.getElementById('attachmentMenu');
-  const emoji = document.getElementById('emojiPicker');
-  if (!plus || !menu) return;
-  plus.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    menu.classList.toggle('show');
-    emoji?.classList.remove('show');
-  });
-  document.addEventListener('click', (event) => {
-    if (!menu.contains(event.target) && event.target !== plus) {
-      menu.classList.remove('show');
-    }
-  });
-})();
-</script>
+
 
 <script>
 /* =========================================================
@@ -3197,9 +3182,29 @@ async function uploadFiles(fileList){
   }
 }
 
-function openAttachmentMenu(){
-  attachmentMenu.classList.toggle('show');
+function closeAttachmentMenu(){
+  attachmentMenu.classList.remove('show');
+  attachmentMenu.style.display = 'none';
+  plusBtn.setAttribute('aria-expanded','false');
 }
+
+function openAttachmentMenu(){
+  const open = !attachmentMenu.classList.contains('show');
+  if(open){
+    attachmentMenu.classList.add('show');
+    attachmentMenu.style.display = 'flex';
+    plusBtn.setAttribute('aria-expanded','true');
+    emojiPicker.classList.remove('show');
+  }else{
+    closeAttachmentMenu();
+  }
+}
+
+plusBtn.addEventListener('click', function(event){
+  event.preventDefault();
+  event.stopPropagation();
+  openAttachmentMenu();
+});
 
 cameraBtn.addEventListener('click', function(){
   attachmentMenu.classList.remove('show');
@@ -3265,8 +3270,15 @@ document.addEventListener('paste', function(event){
 const inputBox = document.querySelector('.input-box');
 
 document.addEventListener('click', function(event){
-  if(!attachmentMenu.contains(event.target) && event.target !== plusBtn){
-    attachmentMenu.classList.remove('show');
+  const target = event.target;
+  if(
+    target === plusBtn ||
+    (target && typeof target.closest === 'function' && target.closest('#plusBtn'))
+  ){
+    return;
+  }
+  if(!attachmentMenu.contains(target)){
+    closeAttachmentMenu();
   }
 });
 
@@ -4002,8 +4014,8 @@ resizeTextarea();
       };
       mediaRecorder.start();
       micState(true);
-      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اضغط الميك مرة ثانية لما تخلص.";
-      mediaTimer=setTimeout(stopMediaRecording,15000);
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اتكلم بوضوح، واضغط الميك مرة ثانية لما تخلص.";
+      mediaTimer=setTimeout(stopMediaRecording,30000);
       return true;
     }catch(error){
       console.warn("MediaRecorder microphone unavailable:",error);
