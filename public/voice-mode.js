@@ -3,10 +3,13 @@
   const stop = document.getElementById('voiceStopBtn');
   const panel = document.getElementById('voiceStatus');
   const status = document.getElementById('voiceStatusText');
+  const rateControl = document.getElementById('voiceRate');
   if (!mic || !panel) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
   let recognition = null, active = false, speaking = false;
+  let voiceRate = Number(localStorage.getItem('codemind_voice_rate') || '1');
+  if (rateControl) { rateControl.value = String(voiceRate); rateControl.addEventListener('change', () => { voiceRate = Number(rateControl.value) || 1; localStorage.setItem('codemind_voice_rate', String(voiceRate)); }); }
   const voiceHistory = [];
   let selectedVoice = null;
   const setStatus = text => { if (status) status.textContent = text; };
@@ -23,7 +26,7 @@
     if (!synth || !text) return;
     synth.cancel();
     const clean = String(text).replace(/```[\s\S]*?```/g, 'الكود مرفق في المحادثة.');
-    const u = new SpeechSynthesisUtterance(clean); u.lang='ar-EG'; u.rate=1; u.pitch=1; if(selectedVoice) u.voice=selectedVoice; speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
+    const u = new SpeechSynthesisUtterance(clean); u.lang='ar-EG'; u.rate=voiceRate; u.pitch=1; if(selectedVoice) u.voice=selectedVoice; speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
     u.onend=()=>{speaking=false;if(active)startListening()}; u.onerror=()=>{speaking=false;if(active)startListening()}; synth.speak(u);
   }
   async function sendVoice(text) {
