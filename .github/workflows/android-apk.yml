@@ -28,6 +28,26 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Apply CodeMind website logo as app icon
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          for item in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
+            density="${item%%:*}"
+            size="${item##*:}"
+            magick public/logo.png \
+              -resize "${size}x${size}" \
+              -background "#0a0d14" \
+              -gravity center \
+              -extent "${size}x${size}" \
+              "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+            cp "android/app/src/main/res/mipmap-${density}/ic_launcher.png" \
+              "android/app/src/main/res/mipmap-${density}/ic_launcher_round.png"
+          done
+          rm -f \
+            android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml \
+            android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
