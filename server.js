@@ -131,8 +131,8 @@ app.get('/health', async (req, res) => {
   attachments: 'enabled',
   projects: 'enabled',
   zip: 'server_archiver'
-}));
-
+  });
+});
 
 app.post('/api/project-zip', express.json({ limit: '7mb' }), (req, res) => {
   const input = req.body;
