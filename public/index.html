@@ -2744,9 +2744,25 @@ async function typeAiResponse(
     */
     if(index === chunkSize){
       requestAnimationFrame(function(){
+        /*
+          نثبت الشاشة عند بداية رسالة الـAI نفسها،
+          وليس عند آخر الشات، حتى يظهر أول حرف
+          من الرد للمستخدم مباشرة.
+        */
+        const chatRect =
+          chatScroll.getBoundingClientRect();
+
+        const messageRect =
+          message.getBoundingClientRect();
+
+        const targetTop =
+          chatScroll.scrollTop +
+          (messageRect.top - chatRect.top) -
+          10;
+
         chatScroll.scrollTo({
-          top: chatScroll.scrollHeight,
-          behavior: 'smooth'
+          top: Math.max(0, targetTop),
+          behavior: 'auto'
         });
       });
     }
@@ -3373,8 +3389,8 @@ async function sendMessage(){
     );
 
     /*
-      لا نعمل auto-scroll بعد انتهاء الرد؛
-      النزول التلقائي حصل مرة واحدة عند أول حرف.
+      لا نغير موضع الشاشة بعد انتهاء الرد.
+      المستخدم يظل عند بداية رد الـAI.
     */
 
     /*
