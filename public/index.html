@@ -4062,20 +4062,45 @@ window.CodeMindToggleAttachmentMenu = function(event){
   const willOpen = !menu.classList.contains('show');
 
   if(willOpen){
+    if(emoji) emoji.classList.remove('show');
+
+    // Use fixed positioning from the button so the menu cannot be clipped
+    // by a mobile scrolling/overflow container.
+    const rect = plus.getBoundingClientRect();
     menu.classList.add('show');
+    menu.style.position = 'fixed';
+    menu.style.left = 'auto';
+    menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    menu.style.bottom = Math.max(8, window.innerHeight - rect.top + 8) + 'px';
+    menu.style.top = 'auto';
     menu.style.display = 'flex';
     menu.style.visibility = 'visible';
     menu.style.opacity = '1';
+    menu.style.zIndex = '99999';
     plus.setAttribute('aria-expanded','true');
-    if(emoji) emoji.classList.remove('show');
   }else{
     menu.classList.remove('show');
     menu.style.display = 'none';
+    menu.style.visibility = 'hidden';
+    menu.style.opacity = '0';
     plus.setAttribute('aria-expanded','false');
   }
 
   return false;
 };
+
+// Bind the + button again from JavaScript as a second, reliable path.
+// This also works if an older cached HTML version has a stale inline handler.
+(function(){
+  const plus = document.getElementById('plusBtn');
+  if(!plus || plus.dataset.codemindPlusV2 === '1') return;
+  plus.dataset.codemindPlusV2 = '1';
+  plus.addEventListener('click', function(event){
+    event.preventDefault();
+    event.stopPropagation();
+    window.CodeMindToggleAttachmentMenu(event);
+  }, true);
+})();
 </script>
 </body>
 </html>
