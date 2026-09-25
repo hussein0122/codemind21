@@ -57,6 +57,22 @@
   }
 
   async function downloadZip(project) {
+    const bytes = projectBytes(project);
+    if (bytes > 6 * 1024 * 1024) {
+      const response = await fetch('/api/project-zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      });
+      if (!response.ok) throw new Error('server_zip_failed');
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${safeName(project.name)}.zip`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+      return;
+    }
     if (!window.JSZip) throw new Error('JSZip is not loaded');
     const zip = new window.JSZip();
     project.files.forEach((file) => zip.file(file.path, file.content));
