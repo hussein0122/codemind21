@@ -3920,15 +3920,44 @@ resizeTextarea();
       history.push({role:"user",content:text},{role:"assistant",content:reply});history=history.slice(-20);speak(reply);
     }catch(e){state("");callState("حصل خطأ في الاتصال","حاول مرة تانية.");if(inCall)setTimeout(listen,1000)}
   }
-  function speak(text){
+  function splitSpeechText(text){
+    const clean=String(text||"").replace(/[*_#>]/g," ").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu," ").replace(/\s+/g," ").trim();
+    if(!clean)return [];
+    const sentences=clean.match(/[^.!?؟؛]+[.!?؟؛]?/g)||[clean];
+    const chunks=[]; let current="";
+    for(const raw of sentences){
+      const sentence=raw.trim(); if(!sentence)continue;
+      if((current+" "+sentence).trim().length<=190){current=(current+" "+sentence).trim();continue;}
+      if(current){chunks.push(current);current="";}
+      if(sentence.length<=190){current=sentence;continue;}
+      for(let i=0;i<sentence.length;i+=185)chunks.push(sentence.slice(i,i+185).trim());
+    }
+    if(current)chunks.push(current);
+    return chunks.filter(Boolean);
+  }
+  async function speak(text){
     if(!inCall)return;
-    if(!synth){callState("الرد جاهز","الصوت غير مدعوم على الجهاز.");return}
-    try{synth.cancel()}catch(e){}
-    const clean=String(text).replace(/[*_#>]/g," ").replace(/\s+/g," ").trim();
-    const u=new SpeechSynthesisUtterance(clean);u.lang="ar-EG";u.rate=.92;u.pitch=1.02;u.volume=.96;if(voice)u.voice=voice;
-    speaking=true;state("speaking");callState("CodeMind بيرد عليك...","اسمع الرد براحتك");
-    u.onend=()=>{speaking=false;if(inCall){state("");callState("جاهز","اتكلم لما تخلص أفكارك");setTimeout(listen,500)}};
-    u.onerror=u.onend;synth.speak(u);
+    const chunks=splitSpeechText(text); if(!chunks.length)return;
+    speaking=true; state("speaking"); callState("CodeMind بيرد عليك...","خد راحتك، الصوت بيتكلم بشكل طبيعي");
+    try{
+      for(let i=0;i<chunks.length&&inCall;i++){
+        callState("CodeMind بيرد عليك...",i<chunks.length-1?"مستني أكمل لك الرد...":"اسمعني للآخر");
+        const response=await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({text:chunks[i],voice:"noura"})});
+        if(!response.ok)throw new Error("tts_failed");
+        const blob=await response.blob(),url=URL.createObjectURL(blob);
+        await new Promise((resolve,reject)=>{
+          const audio=new Audio(url); audio.preload="auto"; audio.volume=.98;
+          audio.onended=()=>{URL.revokeObjectURL(url);resolve()};
+          audio.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("audio_playback_failed"))};
+          audio.play().catch(reject);
+        });
+      }
+    }catch(error){
+      console.error("Cloud TTS failed:",error); callState("تعذر تشغيل الصوت","حاول مرة تانية.");
+    }finally{
+      speaking=false;
+      if(inCall){state("");callState("جاهز","اتكلم براحتك لما تخلص");setTimeout(listen,500)}
+    }
   }
   function openCall(){
     inCall=true;muted=false;history=[];finalText="";
