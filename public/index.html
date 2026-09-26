@@ -4078,7 +4078,35 @@ resizeTextarea();
       if(inCall){state("");callState("جاهز","اتكلم براحتك لما تخلص");setTimeout(listen,500)}
     }
   }
+  function closeComposerPopups(){
+    // The + menu is fixed-positioned, so removing only its visual class
+    // is not enough in every mobile browser. Fully reset it before opening
+    // the voice-call screen.
+    if(menu){
+      menu.classList.remove("show");
+      menu.style.display="none";
+      menu.style.visibility="hidden";
+      menu.style.opacity="0";
+      menu.style.position="";
+      menu.style.left="";
+      menu.style.right="";
+      menu.style.top="";
+      menu.style.bottom="";
+      menu.style.zIndex="";
+    }
+    if(typeof plusBtn!=="undefined" && plusBtn){
+      plusBtn.setAttribute("aria-expanded","false");
+    }
+    const emoji=document.getElementById("emojiPicker");
+    if(emoji){
+      emoji.classList.remove("show");
+      emoji.style.display="";
+    }
+  }
+
   function openCall(){
+    // Close the + attachments menu immediately when the voice call starts.
+    closeComposerPopups();
     inCall=true;muted=false;history=[];finalText="";
     document.body.classList.add("voice-call-active");screen.classList.add("open");screen.setAttribute("aria-hidden","false");
     callState("المكالمة بدأت","خد وقتك... أنا سامعك");setTimeout(listen,450);
