@@ -321,12 +321,18 @@ app.use((error, req, res, next) => {
   return res.status(500).json({ error: 'internal_error', message: 'حدث خطأ داخلي.' });
 });
 
-if (!process.env.VERCEL) {
-  initializeAuth().then(() => initializeConversations()).then(() => app.listen(port, () => console.log(`CodeMind AI backend running on http://localhost:${port}`)))
-    .catch(error => { console.error('Auth/database initialization failed:', error.message); process.exitCode = 1; });
-} else {
-  // Database initialization must never crash the Vercel function during cold start.
-  // Authentication routes report a clear configuration/database error when unavailable.
-  initializeAuth().then(() => initializeConversations()).catch(error => console.error('Database initialization failed:', error?.message || error));
-}
+// Vercel's Express runtime captures the server created by app.listen(port).
+// Start the listener in both local and Vercel environments. Database setup runs in the
+// background on Vercel so a database outage cannot prevent the HTTP server from starting.
+initializeAuth()
+  .then(() => initializeConversations())
+  .catch(error => {
+    console.error('Auth/database initialization failed:', error?.message || error);
+    if (!process.env.VERCEL) process.exitCode = 1;
+  });
+
+app.listen(port, () => {
+  console.log("CodeMind AI backend running on http://localhost:" + port);
+});
+
 export default app;
