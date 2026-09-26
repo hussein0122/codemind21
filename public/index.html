@@ -3551,6 +3551,12 @@ async function sendMessage(){
 
   }
 
+  // Download the currently open/generated project directly without
+  // spending an AI request or hitting Groq token limits.
+  if(await handleDirectProjectZipRequest(text)){
+    return;
+  }
+
   /*
     نحفظ مكان المستخدم قبل بدء الرد.
     ولن نغيره بعد ذلك.
