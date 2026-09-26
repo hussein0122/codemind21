@@ -3437,6 +3437,51 @@ document.addEventListener('click', function(event){
 
 
 /* =========================================================
+   DIRECT PROJECT ZIP COMMAND
+========================================================= */
+
+function isDirectProjectZipRequest(text){
+  const value=String(text||'').trim().toLowerCase();
+  return /(?:ملف\s*مضغوط|ملف\s*zip|zip|اضغط|ضغط\s+الموقع|ارفع\s+الموقع|تحميل\s+الموقع|تحميل\s+المشروع|حمّل\s+الموقع|حمّل\s+المشروع)/i.test(value);
+}
+
+async function handleDirectProjectZipRequest(text){
+  if(!isDirectProjectZipRequest(text)) return false;
+  const project=window.CodeMindProjectWorkspace?.getCurrentProject?.() || null;
+  if(!project || !Array.isArray(project.files) || !project.files.length) return false;
+
+  heroSection.style.display='none';
+  statusBanner.textContent='';
+  addUserMessage(text,[]);
+  conversationHistory.push({role:'user',content:text});
+  conversationHistory=conversationHistory.slice(-MAX_HISTORY_MESSAGES);
+  saveConversationHistory();
+
+  const loading=document.getElementById('loadingMessage');
+  if(loading) loading.remove();
+  const message=createAiMessageElement();
+  messagesContainer.appendChild(message);
+  const textElement=message.querySelector('.ai-text');
+  textElement.textContent='جاري تجهيز ملف ZIP للموقع...';
+
+  try{
+    if(!window.CodeMindProjectWorkspace?.downloadZip){
+      throw new Error('ميزة ضغط المشروع غير متاحة حاليًا.');
+    }
+    await window.CodeMindProjectWorkspace.downloadZip(project);
+    textElement.textContent='تم تجهيز ملف ZIP للموقع وبدأ التحميل.';
+    conversationHistory.push({role:'assistant',content:'تم تجهيز ملف ZIP للموقع وبدأ التحميل.'});
+    conversationHistory=conversationHistory.slice(-MAX_HISTORY_MESSAGES);
+    saveConversationHistory();
+  }catch(error){
+    console.error('Direct project ZIP failed:',error);
+    textElement.textContent='تعذر تجهيز ملف ZIP. جرّب زر «تحميل ZIP» من بطاقة المشروع.';
+    statusBanner.textContent='⚠️ تعذر إنشاء الملف المضغوط.';
+  }
+  return true;
+}
+
+/* =========================================================
    SEND MESSAGE
 ========================================================= */
 
