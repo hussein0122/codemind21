@@ -8,7 +8,7 @@ import archiver from 'archiver';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { isAiConfigured, createCompletion, transcribeAudio, createSpeech } from './services/ai.service.js';
+import { isAiConfigured, getConfiguredProviders, createCompletion, transcribeAudio, createSpeech } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
 import { authDatabaseReady, checkAuthDatabase, initializeAuth, registerAuthRoutes, optionalAuth, requireAuth } from './services/auth.service.js';
