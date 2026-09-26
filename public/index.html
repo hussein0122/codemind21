@@ -8002,33 +8002,8 @@ resizeTextarea();
     }
   }
 
-  function startBrowserRecognition(){
-    if(!R){
-      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="⚠️ المتصفح لا يدعم التسجيل الصوتي.";
-      return;
-    }
-    rec=new R();
-    rec.lang="ar-EG";
-    rec.continuous=true;
-    rec.interimResults=true;
-    rec.maxAlternatives=3;
-    rec.onstart=()=>{listening=true;micState(true);};
-    rec.onresult=e=>{
-      let f="",i="";
-      for(let n=e.resultIndex;n<e.results.length;n++){
-        const result=e.results[n];
-        const t=result?.[0]?.transcript||"";
-        if(result.isFinal)f+=t;else i+=t;
-      }
-      if(f)finalText+=f;
-      ta.value=[base,finalText.trim(),i.trim()].filter(Boolean).join(" ");
-      ta.dispatchEvent(new Event("input",{bubbles:true}));
-    };
-    rec.onerror=()=>{stopRec();};
-    rec.onend=()=>{listening=false;micState(false);};
-    try{rec.start()}catch{}
-  }
-
+  // Normal microphone: MediaRecorder -> /api/transcribe -> Whisper only.
+  // Voice-call speech recognition is isolated above so it can never duplicate this handler.
   mic.addEventListener("click",async()=>{
     if(inCall)return;
 
@@ -8038,16 +8013,7 @@ resizeTextarea();
       return;
     }
 
-    if(listening){
-      stopRec();
-      if(finalText.trim())insertTranscript(finalText);
-      finalText="";
-      return;
-    }
-
-    base=ta.value.trim();
-    finalText="";
-
+    recordingBase=ta.value.trim();
     const started=await startMediaRecording();
     if(!started){
       if(typeof statusBanner!=="undefined" && statusBanner){
