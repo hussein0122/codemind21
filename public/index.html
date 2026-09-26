@@ -585,6 +585,132 @@ button{
 }
 
 /* =========================================================
+   PROJECT PREVIEW
+========================================================= */
+
+.project-preview-modal{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(8px);
+}
+.project-preview-modal.show{display:flex}
+.project-preview-panel{
+  width:min(1180px,100%);
+  height:min(820px,92vh);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--bg,#0b0d12);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:0 25px 80px rgba(0,0,0,.5);
+}
+.project-preview-head{
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+}
+.project-preview-title{font-weight:800}
+.project-preview-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.project-preview-tool{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+  border-radius:9px;
+  padding:7px 10px;
+  cursor:pointer;
+  font-size:.76rem;
+}
+.project-preview-tool.active,.project-preview-tool.primary{
+  background:var(--grad);
+  color:#fff;
+  border-color:transparent;
+}
+.project-preview-body{
+  min-height:0;
+  flex:1;
+  display:grid;
+  grid-template-columns:220px minmax(0,1fr);
+}
+.project-preview-files{
+  overflow:auto;
+  padding:9px;
+  border-left:1px solid var(--border);
+  background:rgba(255,255,255,.02);
+}
+.project-preview-file{
+  width:100%;
+  display:block;
+  text-align:right;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  padding:9px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  font-family:'JetBrains Mono',monospace;
+  font-size:.72rem;
+}
+.project-preview-file:hover,.project-preview-file.active{
+  background:var(--panel);
+  color:var(--text);
+}
+.project-preview-stage{
+  min-width:0;
+  min-height:0;
+  padding:12px;
+  background:#11151c;
+}
+.project-preview-frame-wrap{
+  width:100%;
+  height:100%;
+  display:flex;
+  justify-content:center;
+  align-items:stretch;
+}
+.project-preview-frame{
+  width:100%;
+  height:100%;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+}
+.project-preview-code{
+  width:100%;
+  height:100%;
+  overflow:auto;
+  margin:0;
+  padding:18px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#0a0d12;
+  color:#d7e0ea;
+  font:13px/1.65 'JetBrains Mono',monospace;
+  white-space:pre-wrap;
+  direction:ltr;
+  text-align:left;
+}
+@media(max-width:700px){
+  .project-preview-modal{padding:7px}
+  .project-preview-panel{height:96vh;border-radius:14px}
+  .project-preview-body{grid-template-columns:1fr}
+  .project-preview-files{max-height:145px;border-left:0;border-bottom:1px solid var(--border);display:flex;gap:6px;overflow:auto}
+  .project-preview-file{min-width:max-content;width:auto}
+  .project-preview-tools{justify-content:flex-end}
+  .project-preview-tool{padding:6px 8px}
+}
+
+/* =========================================================
    PROJECT CARD
 ========================================================= */
 
@@ -2547,110 +2673,188 @@ function addProjectCard(
   project
 ){
 
-  if(
-    !project ||
-    !Array.isArray(project.files)
-  ){
+  if(!project || !Array.isArray(project.files)) return;
 
-    return;
+  const card=document.createElement('div');
+  card.className='project-card';
 
-  }
+  const projectName=project.name||'مشروع CodeMind';
+  const files=project.files;
+  const zipUrl=project.zipUrl||project.downloadUrl||'';
 
-  const card =
-    document.createElement('div');
+  let filesHtml='';
+  files.slice(0,30).forEach(function(file){
+    const name=typeof file==='string'?file:(file.path||file.name);
+    if(name) filesHtml += '<div class="project-file">📄 '+escapeHtml(name)+'</div>';
+  });
 
-  card.className =
-    'project-card';
+  const projectJson=encodeURIComponent(JSON.stringify({
+    name:projectName,
+    files:files.map(function(file){
+      return typeof file==='string'
+        ? {path:file,content:''}
+        : {path:file.path||file.name||'',content:String(file.content||'')};
+    })
+  }));
 
-  const projectName =
-    project.name ||
-    'مشروع CodeMind';
-
-  const files =
-    project.files;
-
-  const zipUrl =
-    project.zipUrl ||
-    project.downloadUrl ||
-    '';
-
-  let filesHtml = '';
-
-  files
-    .slice(0,30)
-    .forEach(
-      function(file){
-
-        const name =
-          typeof file === 'string'
-            ? file
-            : (file.path || file.name);
-
-        if(!name){
-          return;
-        }
-
-        filesHtml += `
-          <div class="project-file">
-            📄 ${escapeHtml(name)}
-          </div>
-        `;
-
-      }
-    );
-
-  card.innerHTML = `
-
+  card.innerHTML=`
     <div class="project-head">
-
-      <div class="project-title">
-        📦 ${escapeHtml(projectName)}
-      </div>
-
-      <div class="project-status">
-        ${zipUrl ? 'جاهز' : 'قيد التجهيز'}
-      </div>
-
+      <div class="project-title">📦 ${escapeHtml(projectName)}</div>
+      <div class="project-status">${zipUrl?'جاهز':'قيد التجهيز'}</div>
     </div>
-
     <div class="project-files">
-      ${filesHtml || `
-        <div class="project-file">
-          📁 سيتم عرض ملفات المشروع هنا
-        </div>
-      `}
+      ${filesHtml||'<div class="project-file">📁 سيتم عرض ملفات المشروع هنا</div>'}
     </div>
-
     <div class="project-actions">
-
-      ${
-        zipUrl
-          ? `
-            <a
-              class="project-btn primary"
-              href="${escapeHtml(zipUrl)}"
-              download>
-              ⬇️ تحميل المشروع ZIP
-            </a>
-          `
-          : `
-            <button
-              class="project-btn"
-              type="button"
-              disabled>
-              ⏳ تجهيز ZIP...
-            </button>
-          `
-      }
-
+      <button class="project-btn primary" type="button" data-project-preview="${projectJson}">👁 استعراض المشروع</button>
+      ${zipUrl
+        ? '<a class="project-btn primary" href="'+escapeHtml(zipUrl)+'" download>⬇️ تحميل المشروع ZIP</a>'
+        : '<button class="project-btn" type="button" disabled>⏳ تجهيز ZIP...</button>'}
     </div>
   `;
 
-  message
-    .querySelector('.bubble')
-    .appendChild(card);
+  const previewButton=card.querySelector('[data-project-preview]');
+  if(previewButton){
+    previewButton.addEventListener('click',function(){
+      try{
+        openProjectPreview(JSON.parse(decodeURIComponent(this.dataset.projectPreview)));
+      }catch(error){
+        console.error('Project preview failed:',error);
+      }
+    });
+  }
 
+  message.querySelector('.bubble').appendChild(card);
 }
+
+
+/* =========================================================
+   PROJECT PREVIEW
+========================================================= */
+
+let activePreviewProject=null;
+let activePreviewFile='index.html';
+
+function escapePreviewHtml(value){
+  return String(value||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function findProjectFile(project,path){
+  return (project?.files||[]).find(function(file){
+    return (file.path||file.name||'')===path;
+  });
+}
+
+function buildStaticPreview(project){
+  const files=project.files||[];
+  let htmlFile=findProjectFile(project,'index.html')||findProjectFile(project,'index.htm')||files.find(function(file){
+    return /\\.html?$/i.test(file.path||file.name||'');
+  });
+
+  if(!htmlFile) return '<!doctype html><html lang="ar"><body style="font-family:Arial;padding:30px"><h2>لا يوجد index.html</h2><p>يمكنك استعراض الملفات من القائمة.</p></body></html>';
+
+  let html=String(htmlFile.content||'');
+  const css=files.filter(function(file){return /\\.css$/i.test(file.path||file.name||'');})
+    .map(function(file){return '<style>\\n'+String(file.content||'')+'\\n</style>';}).join('\\n');
+  const js=files.filter(function(file){return /\\.(?:js|mjs)$/i.test(file.path||file.name||'');})
+    .map(function(file){return '<script>\\n'+String(file.content||'')+'\\n<\\/script>';}).join('\\n');
+
+  html=html.replace(/<link[^>]+href=["'][^"']+\\.css["'][^>]*>\\s*/gi,'');
+  html=html.replace(/<script[^>]+src=["'][^"']+\\.(?:js|mjs)["'][^>]*>\\s*<\\/script>/gi,'');
+  if(/<\\/head>/i.test(html)) html=html.replace(/<\\/head>/i,css+'\\n</head>');
+  else html=css+html;
+  if(/<\\/body>/i.test(html)) html=html.replace(/<\\/body>/i,js+'\\n</body>');
+  else html+=js;
+  return html;
+}
+
+function renderProjectPreviewFiles(){
+  const box=document.getElementById('projectPreviewFiles');
+  if(!box||!activePreviewProject) return;
+  box.innerHTML='';
+  activePreviewProject.files.forEach(function(file){
+    const path=file.path||file.name||'file';
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='project-preview-file'+(path===activePreviewFile?' active':'');
+    button.textContent=path;
+    button.addEventListener('click',function(){
+      activePreviewFile=path;
+      renderProjectPreviewFiles();
+      renderProjectPreviewContent();
+    });
+    box.appendChild(button);
+  });
+}
+
+function renderProjectPreviewContent(){
+  const stage=document.getElementById('projectPreviewStage');
+  if(!stage||!activePreviewProject) return;
+
+  const file=findProjectFile(activePreviewProject,activePreviewFile);
+  const isHtml=/\\.html?$/i.test(activePreviewFile);
+
+  if(isHtml){
+    stage.innerHTML='<iframe class="project-preview-frame" id="projectPreviewFrame" sandbox="allow-scripts" title="معاينة المشروع"></iframe>';
+    document.getElementById('projectPreviewFrame').srcdoc=buildStaticPreview(activePreviewProject);
+  }else{
+    stage.innerHTML='<pre class="project-preview-code">'+escapePreviewHtml(file?.content||'لا يوجد محتوى لهذا الملف.')+'</pre>';
+  }
+}
+
+function openProjectPreview(project){
+  activePreviewProject=project;
+  activePreviewFile=(project.files||[]).some(function(file){return (file.path||file.name)==='index.html'})
+    ? 'index.html'
+    : ((project.files||[{}])[0].path||project.files[0].name||'file');
+
+  const modal=document.getElementById('projectPreviewModal');
+  const title=document.getElementById('projectPreviewTitle');
+  if(title) title.textContent='استعراض: '+(project.name||'مشروع CodeMind');
+  renderProjectPreviewFiles();
+  renderProjectPreviewContent();
+  if(modal){
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden','false');
+  }
+}
+
+function closeProjectPreview(){
+  const modal=document.getElementById('projectPreviewModal');
+  if(modal){
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden','true');
+  }
+  activePreviewProject=null;
+}
+
+function setPreviewWidth(width){
+  const frame=document.getElementById('projectPreviewFrame');
+  if(frame) frame.style.width=width;
+  document.getElementById('previewDesktop')?.classList.toggle('active',width==='100%');
+  document.getElementById('previewMobile')?.classList.toggle('active',width!=='100%');
+}
+
+document.getElementById('previewClose')?.addEventListener('click',closeProjectPreview);
+document.getElementById('previewRefresh')?.addEventListener('click',renderProjectPreviewContent);
+document.getElementById('previewDesktop')?.addEventListener('click',function(){setPreviewWidth('100%')});
+document.getElementById('previewMobile')?.addEventListener('click',function(){setPreviewWidth('390px')});
+document.getElementById('previewNewTab')?.addEventListener('click',function(){
+  const frame=document.getElementById('projectPreviewFrame');
+  if(!frame||!frame.srcdoc) return;
+  const blob=new Blob([frame.srcdoc],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank','noopener');
+  setTimeout(function(){URL.revokeObjectURL(url)},60000);
+});
+document.getElementById('projectPreviewModal')?.addEventListener('click',function(event){
+  if(event.target===this) closeProjectPreview();
+});
 
 
 /* =========================================================
@@ -4256,5 +4460,26 @@ window.CodeMindToggleAttachmentMenu = function(event){
   }, true);
 })();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/project-workspace.js"></script><script src="/account.js"></script></body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/project-workspace.js"></script><script src="/account.js"></script><!-- CodeMind Project Preview -->
+<div class="project-preview-modal" id="projectPreviewModal" aria-hidden="true">
+  <div class="project-preview-panel" role="dialog" aria-modal="true" aria-label="استعراض المشروع">
+    <div class="project-preview-head">
+      <div class="project-preview-title" id="projectPreviewTitle">استعراض المشروع</div>
+      <div class="project-preview-tools">
+        <button class="project-preview-tool active" id="previewDesktop" type="button">سطح المكتب</button>
+        <button class="project-preview-tool" id="previewMobile" type="button">موبايل</button>
+        <button class="project-preview-tool" id="previewRefresh" type="button">تحديث</button>
+        <button class="project-preview-tool" id="previewNewTab" type="button">فتح</button>
+        <button class="project-preview-tool" id="previewClose" type="button">إغلاق</button>
+      </div>
+    </div>
+    <div class="project-preview-body">
+      <aside class="project-preview-files" id="projectPreviewFiles"></aside>
+      <section class="project-preview-stage">
+        <div class="project-preview-frame-wrap" id="projectPreviewStage"></div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
 </html>
