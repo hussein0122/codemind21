@@ -283,6 +283,14 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
     const existingProject = normalizeProject(currentProject);
     const projectRequest = isProjectRequest(message, existingProject);
     const messages = buildSafeHistory(history);
+    if (projectRequest) {
+      // Project generation must leave enough Groq TPM budget for the generated files.
+      // Long chat history is especially expensive because the project prompt already contains the current project when editing.
+      messages.splice(0, messages.length, ...buildSafeHistory(history).slice(-2).map((item) => ({
+        role: item.role,
+        content: item.content.slice(-3500)
+      })));
+    }
     let webContext = '';
     const wantsFreshInfo = Boolean(webSearch) || /\b(latest|today|current|news|price|version|release|weather)\b/i.test(message) || /\b(النهارده|اليوم|حاليًا|اخر|آخر|أخبار|سعر|نسخة|إصدار|الطقس|دلوقتي)\b/i.test(message);
     if (wantsFreshInfo) {
