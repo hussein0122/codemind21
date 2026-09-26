@@ -8,8 +8,8 @@
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
   let recognition = null, active = false, speaking = false;
-  let voiceRate = Number(localStorage.getItem('codemind_voice_rate') || '1');
-  if (rateControl) { rateControl.value = String(voiceRate); rateControl.addEventListener('change', () => { voiceRate = Number(rateControl.value) || 1; localStorage.setItem('codemind_voice_rate', String(voiceRate)); }); }
+  let voiceRate = Number(localStorage.getItem('codemind_voice_rate') || '0.92');
+  if (rateControl) { rateControl.value = String(voiceRate); rateControl.addEventListener('change', () => { voiceRate = Number(rateControl.value) || 0.92; localStorage.setItem('codemind_voice_rate', String(voiceRate)); }); }
   const voiceHistory = [];
   let selectedVoice = null;
   const setStatus = text => { if (status) status.textContent = text; };
@@ -17,17 +17,40 @@
   function pickVoice() {
     if (!('speechSynthesis' in window)) return null;
     const voices = speechSynthesis.getVoices();
-    return voices.find(v => v.lang === 'ar-EG') || voices.find(v => /^ar(-|_)/i.test(v.lang)) || voices[0] || null;
+    return voices.find(v => /^ar-EG$/i.test(v.lang)) || voices.find(v => /^ar(-|_)/i.test(v.lang)) || null;
   }
   speechSynthesis?.addEventListener?.('voiceschanged', () => { selectedVoice = pickVoice(); });
   selectedVoice = pickVoice();
 
+  function prepareSpeech(text) {
+    return String(text)
+      .replace(/```[\s\S]*?```/g, 'الكود موجود في المحادثة.')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+      .replace(/\n{2,}/g, '. ')
+      .replace(/\s*([،؛])\s*/g, '$1 ')
+      .replace(/\s*([.!؟])\s*/g, '$1 ')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
   function speak(text) {
     if (!synth || !text) return;
     synth.cancel();
-    const clean = String(text).replace(/```[\s\S]*?```/g, 'الكود مرفق في المحادثة.');
-    const u = new SpeechSynthesisUtterance(clean); u.lang='ar-EG'; u.rate=voiceRate; u.pitch=1; if(selectedVoice) u.voice=selectedVoice; speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
-    u.onend=()=>{speaking=false;if(active)startListening()}; u.onerror=()=>{speaking=false;if(active)startListening()}; synth.speak(u);
+    const clean = prepareSpeech(text);
+    if (!clean) { if(active) startListening(); return; }
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang='ar-EG';
+    u.rate=Math.min(1.15, Math.max(0.75, voiceRate));
+    u.pitch=1.03;
+    if(selectedVoice) u.voice=selectedVoice;
+    speaking=true; setStatus('🔊 CodeMind بيرد عليك...');
+    u.onend=()=>{speaking=false;if(active)startListening()};
+    u.onerror=()=>{speaking=false;if(active)startListening()};
+    synth.speak(u);
   }
   async function sendVoice(text) {
     setStatus('🧠 بفكر في رد مناسب...');
