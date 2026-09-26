@@ -60,7 +60,7 @@ function balancedObjects(text) {
 function recoverProjectFromMarkdown(raw) {
   const text = String(raw || '');
   const blocks = [];
-  const re = /\`\`\`(?:html?|css|javascript|js|jsx|tsx|json|typescript|ts)?\\s*\\n([\\s\\S]*?)\`\`\`/gi;
+  const re = /\`\`\`(?:html?|css|javascript|js|jsx|tsx|json|typescript|ts)?\s*\n([\s\\S]*?)\`\`\`/gi;
   let match;
   while ((match = re.exec(text))) {
     const content = match[1].trim();
@@ -69,12 +69,12 @@ function recoverProjectFromMarkdown(raw) {
   if (!blocks.length) return null;
 
   const paths = [];
-  const structure = text.match(/##\\s*Project Structure[\\s\\S]*?(?=##\\s|$)/i)?.[0] || '';
-  const pathRe = /(?:├─|│\\s*├─|\\|--|--\\s*)([A-Za-z0-9_./-]+(?:\\.[A-Za-z0-9]+)?)/g;
+  const structure = text.match(/##\s*Project Structure[\s\\S]*?(?=##\s|$)/i)?.[0] || '';
+  const pathRe = /(?:├─|│\s*├─|\\|--|--\s*)([A-Za-z0-9_./-]+(?:\.[A-Za-z0-9]+)?)/g;
   let p;
   while ((p = pathRe.exec(structure))) {
     const path = sanitizeProjectPath(p[1]);
-    if (path && /\\.[A-Za-z0-9]+$/.test(path)) paths.push(path);
+    if (path && /\.[A-Za-z0-9]+$/.test(path)) paths.push(path);
   }
 
   const preferred = ['index.html','style.css','script.js','src/App.jsx','src/main.jsx','src/index.css','package.json','vite.config.js'];
@@ -84,8 +84,8 @@ function recoverProjectFromMarkdown(raw) {
   const files = blocks.map((content, i) => {
     const path = selectedPaths[i] || (
       /<html|<!doctype/i.test(content) ? 'index.html' :
-      /(^|\\n)\\s*[{.]?[#@a-z-]+\\s*[{]/i.test(content) ? 'style.css' :
-      /(^|\\n)\\s*(import |const |let |function |document\\.)/i.test(content) ? 'script.js' :
+      /(^|\n)\s*[{.]?[#@a-z-]+\s*[{]/i.test(content) ? 'style.css' :
+      /(^|\n)\s*(import |const |let |function |document\.)/i.test(content) ? 'script.js' :
       `file-${i + 1}.txt`
     );
     return { path: sanitizeProjectPath(path), content };
