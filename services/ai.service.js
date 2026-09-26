@@ -43,6 +43,35 @@ export async function transcribeAudio({ buffer, mimeType = 'audio/webm', filenam
   return text;
 }
 
+export async function createSpeech({ text, voice = 'noura' }) {
+  if (!isAiConfigured()) throw new Error('AI_NOT_CONFIGURED');
+  const input = String(text || '').trim().slice(0, 200);
+  if (!input) throw new Error('EMPTY_TTS_TEXT');
+  const allowedVoices = new Set(['abdullah','fahad','sultan','lulwa','noura','aisha']);
+  const selectedVoice = allowedVoices.has(String(voice)) ? String(voice) : 'noura';
+  const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_TTS_MODEL || 'canopylabs/orpheus-arabic-saudi',
+      voice: selectedVoice,
+      input,
+      response_format: 'wav'
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    const error = new Error('TTS_REQUEST_FAILED');
+    error.status = response.status;
+    error.detail = detail.slice(0, 500);
+    throw error;
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
 export async function createCompletion({ messages, mode, structured = false, imageAttachments = [] }) {
   const client = createAiClient();
   if (!client) throw new Error('AI_NOT_CONFIGURED');
