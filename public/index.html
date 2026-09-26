@@ -2753,22 +2753,22 @@ function findProjectFile(project,path){
 function buildStaticPreview(project){
   const files=project.files||[];
   let htmlFile=findProjectFile(project,'index.html')||findProjectFile(project,'index.htm')||files.find(function(file){
-    return /\\.html?$/i.test(file.path||file.name||'');
+    return /\.html?$/i.test(file.path||file.name||'');
   });
 
   if(!htmlFile) return '<!doctype html><html lang="ar"><body style="font-family:Arial;padding:30px"><h2>لا يوجد index.html</h2><p>يمكنك استعراض الملفات من القائمة.</p></body></html>';
 
   let html=String(htmlFile.content||'');
-  const css=files.filter(function(file){return /\\.css$/i.test(file.path||file.name||'');})
+  const css=files.filter(function(file){return /\.css$/i.test(file.path||file.name||'');})
     .map(function(file){return '<style>\\n'+String(file.content||'')+'\\n</style>';}).join('\\n');
-  const js=files.filter(function(file){return /\\.(?:js|mjs)$/i.test(file.path||file.name||'');})
-    .map(function(file){return '<script>\\n'+String(file.content||'')+'\\n<\\/script>';}).join('\\n');
+  const js=files.filter(function(file){return /\.(?:js|mjs)$/i.test(file.path||file.name||'');})
+    .map(function(file){return '<script>\\n'+String(file.content||'')+'\\n<\/script>';}).join('\\n');
 
-  html=html.replace(/<link[^>]+href=["'][^"']+\\.css["'][^>]*>\\s*/gi,'');
-  html=html.replace(/<script[^>]+src=["'][^"']+\\.(?:js|mjs)["'][^>]*>\\s*<\\/script>/gi,'');
-  if(/<\\/head>/i.test(html)) html=html.replace(/<\\/head>/i,css+'\\n</head>');
+  html=html.replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>\\s*/gi,'');
+  html=html.replace(/<script[^>]+src=["'][^"']+\.(?:js|mjs)["'][^>]*>\\s*<\/script>/gi,'');
+  if(/<\/head>/i.test(html)) html=html.replace(/<\/head>/i,css+'\\n</head>');
   else html=css+html;
-  if(/<\\/body>/i.test(html)) html=html.replace(/<\\/body>/i,js+'\\n</body>');
+  if(/<\/body>/i.test(html)) html=html.replace(/<\/body>/i,js+'\\n</body>');
   else html+=js;
   return html;
 }
