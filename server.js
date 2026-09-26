@@ -8,7 +8,7 @@ import archiver from 'archiver';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { isAiConfigured, createCompletion, transcribeAudio } from './services/ai.service.js';
+import { isAiConfigured, createCompletion, transcribeAudio, createSpeech } from './services/ai.service.js';
 import { isProjectRequest, buildProjectPrompt, parseProjectResponse } from './services/project-builder.service.js';
 import { normalizeProject } from './services/project.service.js';
 import { authDatabaseReady, checkAuthDatabase, initializeAuth, registerAuthRoutes, optionalAuth, requireAuth } from './services/auth.service.js';
@@ -217,6 +217,29 @@ app.post('/api/project-zip', express.json({ limit: '20mb' }), (req, res) => {
   archive.pipe(res);
   for (const file of project.files) archive.append(file.content, { name: `${projectName}/${file.path}` });
   archive.finalize();
+});
+
+app.post('/api/tts', optionalAuth, async (req, res) => {
+  try {
+    if (!isAiConfigured()) return res.status(503).json({ error: 'ai_not_configured', message: 'GROQ_API_KEY غير موجود في إعدادات Vercel.' });
+    const text = String(req.body?.text || '').trim();
+    const voice = String(req.body?.voice || process.env.GROQ_TTS_VOICE || 'noura').trim().toLowerCase();
+    if (!text || text.length > 200) {
+      return res.status(400).json({ error: 'invalid_tts_text', message: 'نص الصوت يجب ألا يتجاوز 200 حرف.' });
+    }
+    const audio = await createSpeech({ text, voice });
+    res.status(200).set({
+      'Content-Type': 'audio/wav',
+      'Content-Length': String(audio.length),
+      'Cache-Control': 'no-store'
+    }).send(audio);
+  } catch (error) {
+    console.error('TTS request failed:', error?.message || error);
+    return res.status(error?.status === 429 ? 429 : 502).json({
+      error: 'tts_request_failed',
+      message: 'تعذر توليد الصوت الآن. حاول مرة أخرى.'
+    });
+  }
 });
 
 app.post('/api/chat', optionalAuth, async (req, res) => {
