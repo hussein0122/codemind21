@@ -95,8 +95,8 @@ export async function createCompletion({ messages, mode, structured = false, ima
   const configuredMax = Number(settings?.max_tokens || process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS);
   const projectMax = Number(process.env.GROQ_PROJECT_MAX_TOKENS || DEFAULT_PROJECT_MAX_TOKENS);
   const maxTokens = structured
-    ? Math.min(Math.max(projectMax, 4096), 65536)
-    : Math.min(Math.max(configuredMax, 512), 16000);
+    ? Math.min(Math.max(projectMax, 3500), 4500)
+    : Math.min(Math.max(configuredMax, 512), 8000);
   const request = {
     model,
     messages: [{ role: 'system', content: systemPrompt }, ...preparedMessages],
