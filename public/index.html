@@ -4072,7 +4072,29 @@ resizeTextarea();
         });
       }
     }catch(error){
-      console.error("Cloud TTS failed:",error); callState("تعذر تشغيل الصوت","حاول مرة تانية.");
+      // Keep the call conversational even if the cloud TTS provider returns
+      // a temporary 5xx. Fall back to the browser's Arabic speech engine
+      // instead of silently jumping back to "listening" without a reply.
+      console.error("Cloud TTS failed, using browser speech fallback:",error);
+      if(inCall && synth && typeof synth.speak === "function"){
+        try{
+          await new Promise((resolve,reject)=>{
+            const utterance=new SpeechSynthesisUtterance(text);
+            utterance.lang="ar-EG";
+            utterance.rate=0.95;
+            utterance.pitch=1;
+            utterance.onend=resolve;
+            utterance.onerror=reject;
+            synth.cancel();
+            synth.speak(utterance);
+          });
+        }catch(fallbackError){
+          console.error("Browser speech fallback failed:",fallbackError);
+          callState("تعذر تشغيل صوت الرد","لكن الرد جاهز، اتكلم تاني لما تحب.");
+        }
+      }else{
+        callState("تعذر تشغيل صوت الرد","اتكلم تاني لما تحب.");
+      }
     }finally{
       speaking=false;
       if(inCall){state("");callState("جاهز","اتكلم براحتك لما تخلص");setTimeout(listen,500)}
