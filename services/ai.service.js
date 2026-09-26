@@ -3,7 +3,7 @@ import { getAiSettings } from './auth.service.js';
 
 const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_MAX_TOKENS = 2400;
-const DEFAULT_PROJECT_MAX_TOKENS = 32768;
+const DEFAULT_PROJECT_MAX_TOKENS = 2200;
 const persona = `أنت CodeMind AI، تم تطويرك وبرمجتك بواسطة باشمهندس حسين. لا تقل إنك ChatGPT أو من OpenAI أو Meta. أنت مساعد برمجي وتقني ودود ومتخصص في البرمجة، تطوير الويب، الشبكات، الدعم التقني والأمن السيبراني الدفاعي. أجب بلغة المستخدم وبنفس مستوى الرسمية تقريبًا. إذا تحدث المستخدم بالمصرية فاستخدم المصرية الطبيعية بدون مبالغة. اجعل لك أسلوبًا إنسانيًا دافئًا: افهم السياق، اعرف تمزح بخفة عندما يكون السياق مناسبًا، وكن جادًا في الأسئلة الجادة. يمكنك استخدام إيموجي قليلة ومناسبة للسياق مثل 😂😄🔥❤️👍، ولا تستخدمها في كل جملة أو في المواضيع الرسمية. لا تدّع أن لديك مشاعر حقيقية؛ عبّر عن التعاطف بأسلوب لغوي فقط. لا تكرر النكات أو العبارات نفسها. إذا كان المستخدم غاضبًا أو متضايقًا، ابدأ بالتفهم ثم الحل. كن مختصرًا ومباشرًا: ابدأ بالحل، استخدم نقاطًا قليلة، ولا تكرر السؤال أو تضف مقدمة طويلة. افتراضيًا اجعل الإجابة قصيرة، ووسّع فقط إذا طلب المستخدم شرحًا أو كان الحل يحتاج تفاصيل. في الكود أعطِ أقل شرح ضروري مع كود قابل للاستخدام. لا تدّع البحث أو تشغيل الكود إن لم يحدث فعليًا، ولا تضع أسرارًا حقيقية داخل الكود.`;
 const modes = {
   fast: 'أجب في نقاط قليلة وركز على الحل مباشرة.',
@@ -95,7 +95,7 @@ export async function createCompletion({ messages, mode, structured = false, ima
   const configuredMax = Number(settings?.max_tokens || process.env.GROQ_MAX_TOKENS || DEFAULT_MAX_TOKENS);
   const projectMax = Number(process.env.GROQ_PROJECT_MAX_TOKENS || DEFAULT_PROJECT_MAX_TOKENS);
   const maxTokens = structured
-    ? Math.min(Math.max(projectMax, 3500), 4500)
+    ? Math.min(Math.max(projectMax, 1200), 2600)
     : Math.min(Math.max(configuredMax, 512), 8000);
   const request = {
     model,
@@ -112,6 +112,25 @@ export async function createCompletion({ messages, mode, structured = false, ima
       delete request.response_format;
       console.error('Groq response_format unsupported; retrying with parser fallback');
       return client.chat.completions.create(request);
+    }
+    // Groq TPM errors can reject an otherwise valid request when prompt + output budget
+    // exceeds the model's per-minute token allowance. Retry once with a compact context.
+    if (error?.status === 413 || error?.code === 'rate_limit_exceeded') {
+      const lastUser = [...preparedMessages].reverse().find((item) => item.role === 'user');
+      const compactMessages = [{ role: 'system', content: systemPrompt }];
+      if (lastUser) {
+        const content = typeof lastUser.content === 'string'
+          ? lastUser.content.slice(-6000)
+          : lastUser.content;
+        compactMessages.push({ role: 'user', content });
+      }
+      const retryRequest = {
+        ...request,
+        messages: compactMessages,
+        max_completion_tokens: structured ? 1800 : 1200
+      };
+      console.warn('Groq token budget exceeded; retrying with compact context');
+      return client.chat.completions.create(retryRequest);
     }
     throw error;
   }
