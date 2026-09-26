@@ -3852,25 +3852,25 @@ resizeTextarea();
   const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu");
   const R=window.SpeechRecognition||window.webkitSpeechRecognition, synth=window.speechSynthesis;
   if(!mic||!ta)return;
-  let rec=null,listening=false,base="",finalText="",inCall=false,muted=false,speaking=false,history=[],voice=null;
+  let callRec=null,callListening=false,inCall=false,muted=false,speaking=false,history=[],voice=null,recordingBase="";
   function micState(on){mic.classList.toggle("recording",on);}
   function orbState(s){if(!orb)return;orb.classList.remove("listening","thinking","speaking");if(s)orb.classList.add(s);}
   function callState(a,b){if(status)status.textContent=a;if(hint)hint.textContent=b||"";}
   function pickVoice(){if(!synth)return null;const v=synth.getVoices();return v.find(x=>x.lang==="ar-EG")||v.find(x=>/^ar[-_]/i.test(x.lang))||v[0]||null;}
   if(synth){voice=pickVoice();synth.addEventListener("voiceschanged",()=>voice=pickVoice());}
-  function stopRec(){listening=false;try{if(rec)rec.stop()}catch(e){}rec=null;micState(false);}
+  function stopCallRec(){callListening=false;try{if(callRec)callRec.stop()}catch(e){}callRec=null;micState(false);}
   function listenCall(){
     if(!inCall||muted||speaking)return;
     if(!R){callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");return;}
-    stopRec();rec=new R();rec.lang="ar-EG";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
-    rec.onstart=()=>{listening=true;micState(true);orbState("listening");callState("سامعك...","اتكلم بشكل طبيعي");};
-    rec.onresult=e=>{let text="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)text+=e.results[i][0].transcript;}if(text.trim())sendCall(text.trim());};
-    rec.onerror=()=>{stopRec();if(inCall)callState("جاهز","اتكلم تاني");};
-    rec.onend=()=>{listening=false;micState(false);if(inCall&&!speaking&&!muted)setTimeout(listenCall,300);};
-    try{rec.start()}catch(e){}
+    stopCallRec();callRec=new R();callRec.lang="ar-EG";callRec.continuous=false;callRec.interimResults=true;callRec.maxAlternatives=1;
+    callRec.onstart=()=>{callListening=true;micState(true);orbState("listening");callState("سامعك...","اتكلم بشكل طبيعي");};
+    callRec.onresult=e=>{let text="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)text+=e.results[i][0].transcript;}if(text.trim())sendCall(text.trim());};
+    callRec.onerror=()=>{stopCallRec();if(inCall)callState("جاهز","اتكلم تاني");};
+    callRec.onend=()=>{callListening=false;micState(false);if(inCall&&!speaking&&!muted)setTimeout(listenCall,300);};
+    try{callRec.start()}catch(e){}
   }
   async function sendCall(text){
-    stopRec();orbState("thinking");callState("CodeMind بيفكر...","جاري تجهيز الرد");
+    stopCallRec();orbState("thinking");callState("CodeMind بيفكر...","جاري تجهيز الرد");
     try{
       const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({message:text,mode:"code",history:history.slice(-20),webSearch:false})});
       const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"request_failed");
@@ -3889,7 +3889,7 @@ resizeTextarea();
     u.onerror=u.onend;synth.speak(u);
   }
   function openCall(){inCall=true;muted=false;history=[];screen.classList.add("open");screen.setAttribute("aria-hidden","false");callState("المكالمة بدأت","اتكلم مع CodeMind");listenCall();}
-  function closeCall(){inCall=false;stopRec();try{if(synth)synth.cancel()}catch(e){}screen.classList.remove("open");screen.setAttribute("aria-hidden","true");orbState("");}
+  function closeCall(){inCall=false;stopCallRec();try{if(synth)synth.cancel()}catch(e){}screen.classList.remove("open");screen.setAttribute("aria-hidden","true");orbState("");}
   if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall();});
   if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
   if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم");orbState("");}else listenCall();});
@@ -3902,7 +3902,4019 @@ resizeTextarea();
   function insertTranscript(text){
     const cleaned=String(text||"").trim();
     if(!cleaned)return;
-    ta.value=[base,cleaned].filter(Boolean).join(" ");
+    ta.value=[recordingBase,cleaned].filter(Boolean).join(" ");
+    ta.dispatchEvent(new Event("input",{bubbles:true}));
+    ta.focus();
+  }
+
+  async function transcribeRecordedAudio(blob){
+    if(!blob || !blob.size) return;
+    if(typeof statusBanner!=="undefined" && statusBanner){
+      statusBanner.textContent="🧠 بحوّل صوتك لنص بدقة...";
+    }
+    try{
+      if(blob.size > 4 * 1024 * 1024){
+        throw new Error("audio_too_large");
+      }
+      const response=await fetch("/api/transcribe",{
+        method:"POST",
+        headers:{"Content-Type":blob.type||"audio/webm"},
+        body:blob
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.message||"transcription_failed");
+      insertTranscript(data.text||"");
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="";
+    }catch(error){
+      console.error("Whisper transcription failed:",error);
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        statusBanner.textContent=error?.message==="audio_too_large"
+          ? "⚠️ التسجيل طويل جدًا. اتكلم لمدة أقصر وحاول مرة أخرى."
+          : "⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
+      }
+    }finally{
+      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
+      mediaStream=null;
+    }
+  }
+
+  function stopMediaRecording(){
+    if(mediaTimer){clearTimeout(mediaTimer);mediaTimer=null;}
+    try{mediaRecorder?.stop()}catch{}
+  }
+
+  async function startMediaRecording(){
+    if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)return false;
+    try{
+      if(!window.isSecureContext){
+        throw new Error("insecure_context");
+      }
+      mediaStream=await navigator.mediaDevices.getUserMedia({audio:{
+        channelCount:1,
+        echoCancellation:true,
+        noiseSuppression:true,
+        autoGainControl:true
+      }});
+      const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(type=>MediaRecorder.isTypeSupported(type));
+      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000});
+      mediaChunks=[];
+      mediaRecorder.ondataavailable=(event)=>{if(event.data?.size)mediaChunks.push(event.data)};
+      mediaRecorder.onstop=()=>{
+        const blob=new Blob(mediaChunks,{type:mediaRecorder?.mimeType||"audio/webm"});
+        mediaChunks=[];
+        void transcribeRecordedAudio(blob);
+      };
+      mediaRecorder.start();
+      micState(true);
+      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اتكلم بوضوح، واضغط الميك مرة ثانية لما تخلص.";
+      mediaTimer=setTimeout(stopMediaRecording,20000);
+      return true;
+    }catch(error){
+      console.warn("MediaRecorder microphone unavailable:",error);
+      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
+      mediaStream=null;
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        if(error?.message==="insecure_context"){
+          statusBanner.textContent="⚠️ الميكروفون يحتاج HTTPS. افتح نسخة الموقع على رابط Vercel الآمن.";
+        }else if(error?.name==="NotAllowedError"){
+          statusBanner.textContent="⚠️ المتصفح منع الميكروفون. افتح إعدادات الموقع > الميكروفون > سماح، ثم أعد المحاولة.";
+        }else if(error?.name==="NotFoundError"){
+          statusBanner.textContent="⚠️ لم يتم العثور على ميكروفون في الجهاز.";
+        }else if(error?.name==="NotReadableError"){
+          statusBanner.textContent="⚠️ الميكروفون مستخدم بواسطة تطبيق آخر. أغلقه وحاول مرة أخرى.";
+        }else{
+          statusBanner.textContent="⚠️ تعذر فتح الميكروفون: "+(error?.message||"خطأ غير معروف");
+        }
+      }
+      return false;
+    }
+  }
+
+  // Normal microphone: MediaRecorder -> /api/transcribe -> Whisper only.
+  // Voice-call speech recognition is isolated above so it can never duplicate this handler.
+  mic.addEventListener("click",async()=>{
+    if(inCall)return;
+
+    if(mediaRecorder && mediaRecorder.state==="recording"){
+      stopMediaRecording();
+      micState(false);
+      return;
+    }
+
+    recordingBase=ta.value.trim();
+    const started=await startMediaRecording();
+    if(!started){
+      if(typeof statusBanner!=="undefined" && statusBanner){
+        statusBanner.textContent="⚠️ تعذر تشغيل تسجيل الميكروفون. اسمح بالميكروفون من إعدادات الموقع ثم جرّب مرة أخرى.";
+      }
+    }
+  });
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CodeMind AI">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/logo.png">
+
+<title>CodeMind AI</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0a0d14;
+  --bg2:#0e131d;
+  --panel:rgba(255,255,255,.035);
+  --panel2:rgba(255,255,255,.055);
+  --border:rgba(255,255,255,.08);
+  --border2:rgba(255,255,255,.14);
+  --grad:linear-gradient(135deg,#4f7cff,#8b5cf6);
+  --text:#e7e9f0;
+  --muted:#8993a8;
+  --muted2:#5d6579;
+  --code-bg:#0d1117;
+  --green:#3ecf8e;
+  --red:#ef5a6f;
+  --blue:#4f7cff;
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+
+html,
+body{
+  height:100%;
+}
+
+body{
+  font-family:'Cairo',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  font-size:15px;
+}
+
+button,
+textarea{
+  font-family:inherit;
+}
+
+button{
+  -webkit-tap-highlight-color:transparent;
+}
+
+::-webkit-scrollbar{
+  width:6px;
+  height:6px;
+}
+
+::-webkit-scrollbar-thumb{
+  background:var(--border2);
+  border-radius:10px;
+}
+
+.app{
+  display:flex;
+  height:100dvh;
+}
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
+.sidebar{
+  width:270px;
+  flex-shrink:0;
+  background:var(--bg2);
+  border-left:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  padding:16px 14px;
+  gap:14px;
+  overflow-y:auto;
+  transition:transform .3s ease;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:4px 4px 10px;
+}
+
+.brand-icon{
+  width:34px;
+  height:34px;
+  border-radius:9px;
+  background:var(--grad);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'JetBrains Mono';
+  font-weight:600;
+  font-size:13px;
+  color:#fff;
+  flex-shrink:0;
+}
+
+.brand-text .name{
+  font-weight:800;
+  font-size:1.02rem;
+}
+
+.brand-text .tag{
+  font-size:.68rem;
+  color:var(--muted);
+  letter-spacing:.5px;
+}
+
+.new-chat{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:center;
+  background:var(--grad);
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  padding:11px;
+  font-family:'Cairo';
+  font-weight:600;
+  font-size:.88rem;
+  cursor:pointer;
+  box-shadow:0 6px 18px -6px rgba(79,124,255,.5);
+}
+
+.new-chat:hover{
+  opacity:.9;
+}
+
+.side-label{
+  font-size:.68rem;
+  color:var(--muted2);
+  letter-spacing:.4px;
+  padding:10px 6px 2px;
+  font-weight:600;
+}
+
+.chat-item{
+  padding:10px;
+  border-radius:9px;
+  font-size:.82rem;
+  color:var(--muted);
+  background:rgba(255,255,255,.025);
+  border:1px solid transparent;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.chat-item.active{
+  color:var(--text);
+  border-color:var(--border);
+  background:rgba(255,255,255,.045);
+}
+
+.sidebar-footer{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  border-top:1px solid var(--border);
+  padding-top:10px;
+}
+
+.foot-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:9px 8px;
+  border-radius:8px;
+  font-size:.85rem;
+  color:var(--muted);
+}
+
+/* =========================================================
+   MAIN
+========================================================= */
+
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  position:relative;
+
+  background:
+    radial-gradient(
+      ellipse 700px 400px at 70% -5%,
+      rgba(139,92,246,.09),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 700px 400px at 20% 0%,
+      rgba(79,124,255,.08),
+      transparent
+    ),
+    var(--bg);
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 20px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  backdrop-filter:blur(14px);
+}
+
+.menu-btn{
+  display:none;
+  background:none;
+  border:none;
+  color:var(--text);
+  font-size:1.2rem;
+  cursor:pointer;
+}
+
+.mode-select{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding:7px 13px;
+  border-radius:20px;
+  font-size:.8rem;
+  cursor:pointer;
+  color:var(--text);
+  user-select:none;
+}
+
+.mode-select:hover{
+  border-color:var(--border2);
+}
+
+.mode-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 10px rgba(62,207,142,.5);
+}
+
+.install-app-btn{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+}
+
+.install-app-btn:hover{
+  border-color:var(--border2);
+}
+
+.install-app-btn[hidden]{
+  display:none;
+}
+
+.model-badge{
+  font-size:.75rem;
+  color:var(--muted);
+  border:1px solid var(--border);
+  padding:6px 12px;
+  border-radius:20px;
+}
+
+/* =========================================================
+   CHAT
+========================================================= */
+
+.chat-scroll{
+  flex:1;
+  overflow-y:auto;
+  padding:26px 18px;
+  scroll-behavior:auto;
+}
+
+.wrap{
+  max-width:820px;
+  margin:0 auto;
+}
+
+.hero{
+  text-align:center;
+  padding:42px 10px 26px;
+}
+
+.hero-icon{
+  width:58px;
+  height:58px;
+  border-radius:17px;
+  background:var(--grad);
+  margin:0 auto 18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  box-shadow:0 10px 35px rgba(79,124,255,.18);
+}
+
+.hero-icon img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.hero h1{
+  font-size:1.7rem;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.hero p.lead{
+  color:var(--muted);
+  font-size:.95rem;
+  margin-bottom:6px;
+}
+
+.hero p.desc{
+  color:var(--muted2);
+  font-size:.83rem;
+  max-width:480px;
+  margin:0 auto;
+  line-height:1.8;
+}
+
+.cards-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:11px;
+  margin:26px 0 8px;
+}
+
+.sugg-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:13px;
+  padding:15px;
+  cursor:pointer;
+  text-align:right;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease;
+}
+
+.sugg-card:hover{
+  border-color:rgba(79,124,255,.4);
+  background:var(--panel2);
+  transform:translateY(-2px);
+}
+
+.sugg-card .t{
+  font-weight:600;
+  font-size:.86rem;
+  margin-bottom:3px;
+}
+
+.sugg-card .d{
+  font-size:.75rem;
+  color:var(--muted2);
+}
+
+/* =========================================================
+   MESSAGES
+========================================================= */
+
+.msg{
+  display:flex;
+  gap:12px;
+  margin-bottom:25px;
+  align-items:flex-start;
+  animation:messageIn .18s ease;
+}
+
+@keyframes messageIn{
+  from{
+    opacity:0;
+    transform:translateY(5px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.msg.user{
+  flex-direction:row-reverse;
+}
+
+.avatar{
+  width:31px;
+  height:31px;
+  border-radius:9px;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.75rem;
+  font-weight:700;
+}
+
+.avatar.ai{
+  background:var(--grad);
+  color:#fff;
+  font-family:'JetBrains Mono';
+  overflow:hidden;
+  box-shadow:0 4px 15px rgba(79,124,255,.18);
+}
+
+.avatar.ai img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.avatar.user{
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--muted);
+}
+
+.bubble{
+  max-width:100%;
+  width:100%;
+}
+
+.msg.user .bubble{
+  background:rgba(79,124,255,.14);
+  border:1px solid rgba(79,124,255,.25);
+  border-radius:14px 4px 14px 14px;
+  padding:11px 15px;
+  font-size:.88rem;
+  width:fit-content;
+  max-width:min(680px,100%);
+  white-space:pre-wrap;
+  line-height:1.8;
+}
+
+.msg.ai .bubble{
+  font-size:.95rem;
+  line-height:1.9;
+}
+
+.ai-text{
+  word-wrap:break-word;
+  overflow-wrap:anywhere;
+}
+
+.typing-cursor{
+  display:inline-block;
+  width:7px;
+  height:18px;
+  margin-right:3px;
+  vertical-align:-3px;
+  background:#8993a8;
+  border-radius:2px;
+  animation:blink .8s infinite;
+}
+
+@keyframes blink{
+  0%,45%{
+    opacity:1;
+  }
+
+  46%,100%{
+    opacity:0;
+  }
+}
+
+/* =========================================================
+   CODE
+========================================================= */
+
+.code-block{
+  background:var(--code-bg);
+  border:1px solid var(--border);
+  border-radius:11px;
+  overflow:hidden;
+  margin:14px 0;
+  direction:ltr;
+}
+
+.code-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:8px 14px;
+  background:rgba(255,255,255,.04);
+  border-bottom:1px solid var(--border);
+}
+
+.code-lang{
+  font-family:'JetBrains Mono';
+  font-size:.72rem;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+
+.code-actions button{
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text);
+  font-size:.7rem;
+  cursor:pointer;
+  padding:4px 10px;
+  border-radius:6px;
+  font-family:'Cairo';
+}
+
+.code-actions button:hover{
+  background:rgba(255,255,255,.05);
+}
+
+.code-body{
+  padding:12px 16px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:.85rem;
+  line-height:1.6;
+  overflow-x:auto;
+  text-align:left;
+  color:#d4d4d4;
+  white-space:pre-wrap;
+  direction:ltr;
+}
+
+.inline-code{
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding:2px 6px;
+  border-radius:6px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:.85em;
+  color:#a9bdff;
+  direction:ltr;
+}
+
+.ai-text strong{
+  color:#fff;
+}
+
+.tk-kw{
+  color:#c586c0;
+  font-weight:bold;
+}
+
+.tk-fn{
+  color:#dcdcaa;
+}
+
+.tk-str{
+  color:#ce9178;
+}
+
+.tk-com{
+  color:#6a9955;
+  font-style:italic;
+}
+
+.tk-num{
+  color:#b5cea8;
+}
+
+/* =========================================================
+   PROJECT CARD
+========================================================= */
+
+.project-card{
+  margin-top:15px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.025);
+  border-radius:14px;
+  overflow:hidden;
+}
+
+.project-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:11px 13px;
+  border-bottom:1px solid var(--border);
+}
+
+.project-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+  font-size:.84rem;
+}
+
+.project-status{
+  font-size:.7rem;
+  color:var(--green);
+}
+
+.project-files{
+  padding:8px;
+}
+
+.project-file{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 9px;
+  color:var(--muted);
+  font-family:'JetBrains Mono';
+  font-size:.72rem;
+  border-radius:7px;
+}
+
+.project-file:hover{
+  background:var(--panel);
+  color:var(--text);
+}
+
+.project-actions{
+  display:flex;
+  gap:8px;
+  padding:10px;
+  border-top:1px solid var(--border);
+}
+
+.project-btn{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+  border-radius:8px;
+  padding:7px 11px;
+  cursor:pointer;
+  font-size:.72rem;
+}
+
+.project-btn.primary{
+  background:var(--grad);
+  border:none;
+  color:#fff;
+}
+
+/* =========================================================
+   MESSAGE ACTIONS
+========================================================= */
+
+.msg-actions{
+  display:flex;
+  gap:4px;
+  margin-top:8px;
+  flex-wrap:wrap;
+}
+
+.msg-actions button{
+  background:none;
+  border:1px solid transparent;
+  color:var(--muted2);
+  font-size:.78rem;
+  cursor:pointer;
+  padding:5px 8px;
+  border-radius:7px;
+}
+
+.msg-actions button:hover{
+  background:var(--panel);
+  border-color:var(--border);
+  color:var(--text);
+}
+
+/* =========================================================
+   INPUT
+========================================================= */
+
+.input-zone{
+  padding:14px 18px 18px;
+  flex-shrink:0;
+  position:relative;
+  z-index:1000;
+}
+
+.input-box{
+  max-width:820px;
+  margin:0 auto;
+  background:rgba(20,25,36,.78);
+  border:1px solid var(--border2);
+  border-radius:18px;
+  padding:12px 14px;
+  backdrop-filter:blur(14px);
+  position:relative;
+  box-shadow:0 10px 35px rgba(0,0,0,.12);
+}
+
+.input-box textarea{
+  display:block;
+  width:100%;
+  min-height:28px;
+  background:none;
+  border:none;
+  outline:none;
+  resize:none;
+  color:var(--text);
+  font-family:'Cairo';
+  font-size:.9rem;
+  max-height:150px;
+  line-height:1.7;
+  direction:rtl;
+}
+
+.input-box textarea::placeholder{
+  color:var(--muted2);
+}
+
+.input-tools{
+  display:flex;
+  align-items:center;
+  width:100%;
+  margin-top:8px;
+  direction:rtl;
+  gap:8px;
+}
+
+.input-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
+  direction:rtl;
+}
+
+.input-actions .tool-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.tool-icon,
+.send-icon{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.mic-btn.recording{
+  color:#ff6b7a;
+  border-color:rgba(239,90,111,.55);
+  background:rgba(239,90,111,.12);
+  animation:micPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes micPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(239,90,111,.18);}
+  50%{box-shadow:0 0 0 6px rgba(239,90,111,0);}
+}
+
+.send-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+
+.send-icon{
+  width:19px;
+  height:19px;
+}
+
+.composer-spacer{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.send-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto;
+  direction:ltr;
+}
+
+.input-box.drag-active{
+  border-color:rgba(79,124,255,.8);
+  box-shadow:0 0 0 3px rgba(79,124,255,.12),0 15px 45px rgba(0,0,0,.2);
+}
+
+.attachment-menu{
+  position:absolute;
+  right:12px;
+  bottom:62px;
+  display:none;
+  flex-direction:column;
+  gap:6px;
+  padding:8px;
+  min-width:190px;
+  background:#111722;
+  border:1px solid var(--border2);
+  border-radius:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+  z-index:2000;
+  pointer-events:auto;
+}
+
+.attachment-menu.show{
+  display:flex !important;
+  visibility:visible;
+  opacity:1;
+}
+
+.attachment-option{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  width:100%;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--text);
+  text-align:right;
+  border-radius:8px;
+  padding:9px 10px;
+  cursor:pointer;
+  font-size:.78rem;
+}
+
+.attachment-option:hover{
+  background:var(--panel);
+  border-color:var(--border);
+}
+
+.attachments-preview{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-bottom:9px;
+}
+
+.attachment-chip{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  max-width:100%;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.035);
+  border-radius:10px;
+  font-size:.72rem;
+  color:var(--muted);
+}
+
+.attachment-chip img{
+  width:34px;
+  height:34px;
+  object-fit:cover;
+  border-radius:7px;
+}
+
+.attachment-chip .attachment-info{
+  min-width:0;
+}
+
+.attachment-chip .attachment-name{
+  color:var(--text);
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.attachment-chip .attachment-status{
+  font-size:.65rem;
+  color:var(--muted2);
+}
+
+.attachment-remove{
+  border:0;
+  background:transparent;
+  color:var(--muted2);
+  cursor:pointer;
+  font-size:.85rem;
+}
+
+.attachment-remove:hover{
+  color:#fff;
+}
+
+.message-attachments{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:8px;
+}
+
+.message-attachment{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.035);
+  border-radius:9px;
+  padding:5px 8px;
+  font-size:.7rem;
+  color:var(--muted);
+}
+
+.message-attachment img{
+  width:42px;
+  height:42px;
+  object-fit:cover;
+  border-radius:7px;
+}
+
+.upload-error{
+  color:var(--red);
+}
+
+.upload-success{
+  color:var(--green);
+}
+
+.tool-btn{
+  width:34px;
+  height:34px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--panel);
+  color:var(--muted);
+  cursor:pointer;
+  font-size:1rem;
+}
+
+.tool-btn:hover,
+.tool-btn.active{
+  color:#fff;
+  border-color:rgba(79,124,255,.55);
+  background:rgba(79,124,255,.16);
+}
+
+.tool-btn.active{
+  color:#ff8b9b;
+}
+
+.input-tools > #micBtn{
+  flex-shrink:0;
+}
+
+.send-btn{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  background:var(--grad);
+  border:none;
+  color:#fff;
+  cursor:pointer;
+  font-size:1rem;
+}
+
+.send-btn:hover{
+  opacity:.9;
+}
+
+.send-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
+.hint-row{
+  text-align:center;
+  font-size:.68rem;
+  color:var(--muted2);
+  margin-top:9px;
+}
+
+.err-banner{
+  text-align:center;
+  font-size:.78rem;
+  color:var(--red);
+  padding:8px;
+  min-height:1px;
+}
+
+/* =========================================================
+   EMOJI PICKER
+========================================================= */
+
+.emoji-picker{
+  position:absolute;
+  right:12px;
+  bottom:74px;
+  width:280px;
+  max-height:250px;
+  overflow-y:auto;
+  background:#111722;
+  border:1px solid var(--border2);
+  border-radius:14px;
+  padding:10px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+  display:none;
+  z-index:50;
+}
+
+.emoji-picker.show{
+  display:block;
+  animation:pickerIn .15s ease;
+}
+
+@keyframes pickerIn{
+  from{
+    opacity:0;
+    transform:translateY(5px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.emoji-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+}
+
+.emoji-item{
+  border:none;
+  background:transparent;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:1.25rem;
+  width:34px;
+  height:34px;
+}
+
+.emoji-item:hover{
+  background:rgba(255,255,255,.08);
+}
+
+/* =========================================================
+   SIDEBAR OVERLAY
+========================================================= */
+
+.overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.5);
+  z-index:20;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width:860px){
+
+  .sidebar{
+    position:fixed;
+    z-index:30;
+    top:0;
+    bottom:0;
+    right:0;
+    transform:translateX(100%);
+  }
+
+  .sidebar.open{
+    transform:translateX(0);
+  }
+
+  .menu-btn{
+    display:block;
+  }
+
+  .overlay.show{
+    display:block;
+  }
+
+  .cards-grid{
+    grid-template-columns:1fr;
+  }
+
+  .model-badge{
+    display:none;
+  }
+
+  .topbar{
+    padding:10px 14px;
+  }
+
+  .chat-scroll{
+    padding:18px 12px;
+  }
+
+  .input-zone{
+    padding:10px 10px 14px;
+  }
+
+  .emoji-picker{
+    right:5px;
+    bottom:72px;
+    width:270px;
+  }
+
+  .hero{
+    padding-top:25px;
+  }
+}
+
+@media (max-width:520px){
+
+  .msg{
+    gap:8px;
+  }
+
+  .avatar{
+    width:28px;
+    height:28px;
+  }
+
+  .msg.ai .bubble{
+    font-size:.9rem;
+  }
+
+  .msg.user .bubble{
+    font-size:.84rem;
+  }
+
+  .code-body{
+    font-size:.78rem;
+  }
+
+  .hero h1{
+    font-size:1.45rem;
+  }
+}
+
+/* =========================================================
+   VOICE MODE
+========================================================= */
+.voice-call-screen{display:none;position:fixed;inset:0;z-index:6000;background:rgba(6,9,15,.98);align-items:center;justify-content:center}
+.voice-call-screen.open{display:flex}
+.voice-call-card{width:min(100%,520px);height:100%;max-height:900px;padding:22px;display:flex;flex-direction:column}
+.voice-call-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.voice-call-title{font-weight:800;font-size:1rem}.voice-call-live{font-size:.68rem;color:var(--green);border:1px solid rgba(62,207,142,.25);background:rgba(62,207,142,.08);padding:5px 9px;border-radius:20px}
+.voice-call-close{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:1.35rem;cursor:pointer}
+.voice-call-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.voice-orb{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#8b5cf6 0%,#4f7cff 42%,#101726 72%);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 70px rgba(79,124,255,.24);transition:transform .25s ease,box-shadow .25s ease}
+.voice-orb-core{width:106px;height:106px;border-radius:50%;display:grid;place-items:center;background:rgba(8,12,20,.72);border:1px solid rgba(255,255,255,.12);font-family:'JetBrains Mono';font-weight:700;color:#fff}
+.voice-orb.listening{animation:voiceOrbListen 1.2s ease-in-out infinite}.voice-orb.thinking{animation:voiceOrbThink 1.5s ease-in-out infinite}.voice-orb.speaking{animation:voiceOrbSpeak .65s ease-in-out infinite}
+@keyframes voiceOrbListen{50%{transform:scale(1.04);box-shadow:0 0 0 16px rgba(79,124,255,.08),0 0 80px rgba(79,124,255,.35)}}@keyframes voiceOrbThink{50%{transform:scale(1.025) rotate(2deg);box-shadow:0 0 0 20px rgba(139,92,246,.07),0 0 90px rgba(139,92,246,.34)}}@keyframes voiceOrbSpeak{50%{transform:scale(1.09);box-shadow:0 0 0 28px rgba(79,124,255,.08),0 0 100px rgba(79,124,255,.42)}}
+.voice-call-status{margin-top:28px;font-weight:700;font-size:1rem}.voice-call-hint{margin-top:6px;color:var(--muted);font-size:.76rem}
+.voice-call-actions{display:flex;align-items:center;justify-content:center;gap:16px;padding:20px 0 12px}
+.voice-call-action{width:54px;height:54px;border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:1.15rem;cursor:pointer}.voice-call-action.end{background:rgba(239,90,111,.18);border-color:rgba(239,90,111,.45)}.voice-call-action.muted{opacity:.55}
+@media(max-width:520px){.voice-call-card{padding:16px}.voice-orb{width:165px;height:165px}.voice-orb-core{width:94px;height:94px}}
+
+.voice-call-screen{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(5,8,14,.88);backdrop-filter:blur(12px);padding:20px}.voice-call-screen.open{display:flex}.voice-call-card{width:min(430px,100%);min-height:min(720px,calc(100dvh - 40px));border:1px solid var(--border2);border-radius:24px;background:linear-gradient(180deg,#111722,#0a0d14);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.5)}.voice-call-top{display:flex;align-items:center;justify-content:space-between;padding:18px;border-bottom:1px solid var(--border)}.voice-call-close{width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);font-size:25px;cursor:pointer}.voice-call-title{font-weight:800}.voice-call-live{font-size:.68rem;color:var(--green);border:1px solid rgba(62,207,142,.25);padding:5px 9px;border-radius:20px}.voice-call-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}.voice-orb{width:170px;height:170px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(139,92,246,.35),rgba(79,124,255,.08) 55%,transparent 70%);box-shadow:0 0 70px rgba(79,124,255,.12)}.voice-orb-core{width:112px;height:112px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--grad);color:#fff;font-family:'JetBrains Mono';font-weight:800;box-shadow:0 12px 35px rgba(79,124,255,.3)}.voice-orb.listening{animation:voiceListen 1.2s ease-in-out infinite}.voice-orb.thinking{animation:voiceThink .8s linear infinite}.voice-orb.speaking{animation:voiceSpeak .65s ease-in-out infinite}@keyframes voiceListen{50%{transform:scale(1.08);box-shadow:0 0 90px rgba(79,124,255,.28)}}@keyframes voiceThink{to{transform:rotate(360deg)}}@keyframes voiceSpeak{50%{transform:scale(1.14);box-shadow:0 0 110px rgba(139,92,246,.32)}}.voice-call-status{font-size:1rem;font-weight:700}.voice-call-hint{font-size:.78rem;color:var(--muted)}.voice-call-actions{display:flex;justify-content:center;gap:16px;padding:22px;border-top:1px solid var(--border)}.voice-call-action{width:52px;height:52px;border:1px solid var(--border);border-radius:50%;background:var(--panel);color:var(--text);cursor:pointer;font-size:20px}.voice-call-action.end{background:#b7354b;border-color:#b7354b;color:#fff;width:60px;height:60px}.voice-call-action.muted{background:rgba(239,90,111,.15);border-color:rgba(239,90,111,.55)}@media(max-width:520px){.voice-call-screen{padding:0}.voice-call-card{width:100%;min-height:100dvh;border-radius:0;border:none}}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div
+    class="overlay"
+    id="overlay">
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+
+    <div class="brand">
+
+      <div class="brand-icon">
+        &lt;/&gt;
+      </div>
+
+      <div class="brand-text">
+        <div class="name">CodeMind AI</div>
+        <div class="tag">فكّر • برمج • ابنِ</div>
+      </div>
+
+    </div>
+
+    <button
+      class="new-chat"
+      id="newChatBtn"
+      type="button">
+      ＋ &nbsp; محادثة جديدة
+    </button>
+
+    <div>
+
+      <div class="side-label">
+        المحادثات
+      </div>
+
+      <div
+        class="chat-item active"
+        id="currentChatTitle">
+        محادثة حالية
+      </div>
+
+    </div>
+
+    <div class="sidebar-footer">
+
+      <div class="foot-item">
+        ⚙️ الإعدادات
+      </div>
+
+      <div class="foot-item">
+        👤 الحساب الشخصي
+      </div>
+
+    </div>
+
+  </aside>
+
+  <main class="main">
+
+    <div class="topbar">
+
+      <button
+        class="menu-btn"
+        id="menuBtn"
+        type="button"
+        aria-label="فتح القائمة">
+        ☰
+      </button>
+
+      <div
+        class="mode-select"
+        id="modeSelect">
+
+        <span class="mode-dot"></span>
+
+        <span id="modeLabel">
+          💻 خبير برمجة
+        </span>
+
+      </div>
+
+      <button
+        class="mode-select install-app-btn"
+        id="installAppBtn"
+        type="button"
+        aria-label="تثبيت CodeMind AI"
+        hidden>
+        📲 تثبيت التطبيق
+      </button>
+
+      <div class="model-badge">
+        CodeMind — Real AI
+      </div>
+
+    </div>
+
+    <div
+      class="chat-scroll"
+      id="chatScroll">
+
+      <div class="wrap">
+
+        <div id="heroSection">
+
+          <div class="hero">
+
+            <div class="hero-icon">
+
+              <img
+                src="/logo.png"
+                alt="CodeMind AI">
+
+            </div>
+
+            <h1>
+              CodeMind AI
+            </h1>
+
+            <p class="lead">
+              مساعدك الذكي في البرمجة والتقنية
+            </p>
+
+            <p class="desc">
+              اكتب الكود، أصلح الأخطاء، ابنِ المشاريع،
+              وتعلّم البرمجة باستخدام الذكاء الاصطناعي.
+            </p>
+
+          </div>
+
+          <div class="cards-grid">
+
+            <div
+              class="sugg-card"
+              data-text="أنشئ صفحة تسجيل دخول باستخدام React">
+
+              <div class="t">
+                💻 كتابة كود
+              </div>
+
+              <div class="d">
+                أنشئ صفحة تسجيل دخول باستخدام React
+              </div>
+
+            </div>
+
+            <div
+              class="sugg-card"
+              data-text="اكتشف الخطأ الموجود في كود PHP وأصلحه">
+
+              <div class="t">
+                🐛 إصلاح الأخطاء
+              </div>
+
+              <div class="d">
+                اكتشف الخطأ الموجود في كود PHP وأصلحه
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div id="messagesContainer"></div>
+
+        <div
+          id="statusBanner"
+          class="err-banner">
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="input-zone">
+
+      <div class="input-box">
+
+        <div class="emoji-picker" id="emojiPicker">
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+
+        <div class="attachment-menu" id="attachmentMenu">
+          <button class="attachment-option" id="chooseFileBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <path d="M14 2v6h6"></path>
+            </svg>
+            <span>رفع ملف</span>
+          </button>
+
+          <button class="attachment-option" id="chooseImageBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <path d="m21 15-5-5L5 21"></path>
+            </svg>
+            <span>رفع صورة</span>
+          </button>
+
+          <button class="attachment-option" id="cameraBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path>
+              <circle cx="12" cy="13" r="3"></circle>
+            </svg>
+            <span>الكاميرا</span>
+          </button>
+          <button class="attachment-option" id="voiceCallBtn" type="button">
+            <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.08 5.18 2 2 0 0 1 5.06 3h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L9 10.7a16 16 0 0 0 4.3 4.3l1.27-1.23a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z"></path>
+            </svg>
+            <span>مكالمة صوتية مع CodeMind</span>
+          </button>
+        </div>
+
+        <input id="fileInput" type="file" multiple hidden>
+        <input id="imageInput" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+
+        <div id="attachmentsPreview" class="attachments-preview" aria-live="polite"></div>
+
+        <textarea
+          rows="1"
+          id="ta"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="اسأل CodeMind AI عن أي شيء في البرمجة..."></textarea>
+
+        <div class="input-tools">
+
+          <div class="input-actions">
+            <button
+              class="tool-btn"
+              id="plusBtn"
+              type="button"
+              title="إضافة مرفق"
+              aria-label="إضافة مرفق"
+              aria-expanded="false"
+              >
+              <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+            </button>
+
+            <button
+              class="tool-btn"
+              id="emojiBtn"
+              type="button"
+              title="إضافة Emoji"
+              aria-label="إضافة Emoji">
+              <span aria-hidden="true">😊</span>
+            </button>
+          </div>
+
+          <div class="composer-spacer" aria-hidden="true"></div>
+
+          <div class="send-actions">
+            <button
+              class="send-btn"
+              id="sendBtn"
+              type="button"
+              aria-label="إرسال">
+              <svg class="send-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12h15"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </button>
+
+            <button
+              class="tool-btn mic-btn voice-call-btn"
+              id="micBtn"
+              type="button"
+              title="تحويل الصوت إلى نص"
+              aria-label="تحويل الصوت إلى نص">
+              <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+                <path d="M5 10a7 7 0 0 0 14 0"></path>
+                <path d="M12 17v5M8 22h8"></path>
+              </svg>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="hint-row">
+        CodeMind AI قد يخطئ أحياناً — راجع الأكواد المهمة قبل الاستخدام
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+
+
+<script>
+/* =========================================================
+   MEMORY
+========================================================= */
+
+const MEMORY_KEY =
+  'codemind_conversation_history_v2';
+
+const MAX_HISTORY_MESSAGES = 30;
+const MAX_HISTORY_CHARS = 24000;
+
+
+/* =========================================================
+   ELEMENTS
+========================================================= */
+
+const ta =
+  document.getElementById('ta');
+
+const sendBtn =
+  document.getElementById('sendBtn');
+
+const micBtn =
+  document.getElementById('micBtn');
+
+const emojiBtn =
+  document.getElementById('emojiBtn');
+
+const plusBtn =
+  document.getElementById('plusBtn');
+
+const cameraBtn =
+  document.getElementById('cameraBtn');
+
+const cameraInput =
+  document.getElementById('cameraInput');
+
+const attachmentMenu =
+  document.getElementById('attachmentMenu');
+
+const chooseFileBtn =
+  document.getElementById('chooseFileBtn');
+
+const chooseImageBtn =
+  document.getElementById('chooseImageBtn');
+
+const fileInput =
+  document.getElementById('fileInput');
+
+const imageInput =
+  document.getElementById('imageInput');
+
+const attachmentsPreview =
+  document.getElementById('attachmentsPreview');
+
+const emojiPicker =
+  document.getElementById('emojiPicker');
+
+const emojiGrid =
+  document.getElementById('emojiGrid');
+
+const messagesContainer =
+  document.getElementById('messagesContainer');
+
+const heroSection =
+  document.getElementById('heroSection');
+
+const statusBanner =
+  document.getElementById('statusBanner');
+
+const chatScroll =
+  document.getElementById('chatScroll');
+
+const modeSelect =
+  document.getElementById('modeSelect');
+
+const modeLabel =
+  document.getElementById('modeLabel');
+
+const sidebar =
+  document.getElementById('sidebar');
+
+const overlay =
+  document.getElementById('overlay');
+
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
+function toggleSidebar(){
+
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+
+}
+
+overlay.addEventListener(
+  'click',
+  toggleSidebar
+);
+
+
+/* =========================================================
+   CONVERSATION HISTORY
+========================================================= */
+
+let conversationHistory = [];
+
+
+/* =========================================================
+   LOAD MEMORY
+========================================================= */
+
+function loadConversationHistory(){
+
+  try{
+
+    const saved =
+      localStorage.getItem(MEMORY_KEY);
+
+    if(!saved){
+
+      conversationHistory = [];
+
+      return;
+
+    }
+
+    const parsed =
+      JSON.parse(saved);
+
+    if(!Array.isArray(parsed)){
+
+      conversationHistory = [];
+
+      return;
+
+    }
+
+    conversationHistory =
+      parsed
+        .filter(function(item){
+
+          return (
+            item &&
+            (
+              item.role === 'user' ||
+              item.role === 'assistant'
+            ) &&
+            typeof item.content === 'string' &&
+            item.content.trim()
+          );
+
+        })
+        .slice(-MAX_HISTORY_MESSAGES);
+
+  }catch(error){
+
+    console.error(
+      'Memory load error:',
+      error
+    );
+
+    conversationHistory = [];
+
+  }
+
+}
+
+
+/* =========================================================
+   SAVE MEMORY
+========================================================= */
+
+function saveConversationHistory(){
+
+  try{
+
+    localStorage.setItem(
+      MEMORY_KEY,
+      JSON.stringify(
+        conversationHistory.slice(
+          -MAX_HISTORY_MESSAGES
+        )
+      )
+    );
+
+  }catch(error){
+
+    console.error(
+      'Memory save error:',
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CLEAR MEMORY
+========================================================= */
+
+function clearConversationHistory(){
+
+  conversationHistory = [];
+
+  try{
+
+    localStorage.removeItem(
+      MEMORY_KEY
+    );
+
+  }catch(error){
+
+    console.error(
+      'Memory clear error:',
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CONTEXT FOR BACKEND
+========================================================= */
+
+function getContextHistory(){
+
+  const result = [];
+
+  let totalChars = 0;
+
+  for(
+    let i = conversationHistory.length - 1;
+    i >= 0 &&
+    result.length < MAX_HISTORY_MESSAGES;
+    i--
+  ){
+
+    const item =
+      conversationHistory[i];
+
+    if(
+      !item ||
+      (
+        item.role !== 'user' &&
+        item.role !== 'assistant'
+      ) ||
+      typeof item.content !== 'string'
+    ){
+
+      continue;
+
+    }
+
+    const content =
+      item.content.trim();
+
+    if(!content){
+      continue;
+    }
+
+    const safeContent =
+      content.slice(0,12000);
+
+    if(
+      totalChars + safeContent.length >
+        MAX_HISTORY_CHARS &&
+      result.length >= 4
+    ){
+
+      break;
+
+    }
+
+    let contextContent = safeContent;
+
+    if(Array.isArray(item.attachments) && item.attachments.length){
+      const attachmentContext = item.attachments.map(function(file){
+        const meta = '[مرفق سابق: ' + (file.name || 'attachment') + ' | ' + (file.type || '') + ']';
+        return file.content
+          ? meta + '\n--- BEGIN PREVIOUS ATTACHMENT ---\n' + String(file.content).slice(0, 18000) + '\n--- END PREVIOUS ATTACHMENT ---'
+          : meta + '\n(بيانات المرفق غير محفوظة بالكامل.)';
+      }).join('\n\n');
+
+      contextContent += '\n\n' + attachmentContext;
+      contextContent = contextContent.slice(-24000);
+    }
+
+    result.push({
+
+      role:item.role,
+
+      content:contextContent
+
+    });
+
+    totalChars +=
+      safeContent.length;
+
+  }
+
+  return result.reverse();
+
+}
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(text){
+
+  return String(text || '').replace(
+    /[&<>"']/g,
+    function(match){
+
+      const map = {
+
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+
+      };
+
+      return map[match];
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   SAFE CODE HIGHLIGHT
+========================================================= */
+
+function syntaxHighlight(code){
+
+  const escaped =
+    escapeHtml(code);
+
+  const tokenRegex =
+    /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\n]*|\b(?:function|const|let|var|return|if|else|for|while|class|import|export|from|async|await|new|try|catch|throw)\b|\b\d+(?:\.\d+)?\b)/g;
+
+  return escaped.replace(
+    tokenRegex,
+    function(token){
+
+      if(
+        /^\/\//.test(token)
+      ){
+
+        return `<span class="tk-com">${token}</span>`;
+
+      }
+
+      if(
+        /^["'`]/.test(token)
+      ){
+
+        return `<span class="tk-str">${token}</span>`;
+
+      }
+
+      if(
+        /^\d/.test(token)
+      ){
+
+        return `<span class="tk-num">${token}</span>`;
+
+      }
+
+      return `<span class="tk-kw">${token}</span>`;
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   MARKDOWN
+========================================================= */
+
+function parseMarkdown(text){
+
+  let source =
+    String(text || '');
+
+  const codeBlocks = [];
+
+  source =
+    source.replace(
+      /```([\w+-]*)\n?([\s\S]*?)```/g,
+      function(match,lang,code){
+
+        const index =
+          codeBlocks.length;
+
+        codeBlocks.push({
+
+          lang:
+            lang || 'code',
+
+          code:
+            code
+              .replace(/^\n/,'')
+              .replace(/\n$/,'')
+
+        });
+
+        return `@@CODEBLOCK_${index}@@`;
+
+      }
+    );
+
+  let html =
+    escapeHtml(source);
+
+  html =
+    html.replace(
+      /`([^`]+)`/g,
+      '<span class="inline-code">$1</span>'
+    );
+
+  html =
+    html.replace(
+      /\*\*([^*]+)\*\*/g,
+      '<strong>$1</strong>'
+    );
+
+  html =
+    html.replace(
+      /\n/g,
+      '<br>'
+    );
+
+  html =
+    html.replace(
+      /@@CODEBLOCK_(\d+)@@/g,
+      function(match,index){
+
+        const block =
+          codeBlocks[
+            Number(index)
+          ];
+
+        if(!block){
+          return '';
+        }
+
+        const encoded =
+          encodeURIComponent(
+            block.code
+          );
+
+        return `
+          <div class="code-block">
+
+            <div class="code-head">
+
+              <span class="code-lang">
+                ${escapeHtml(block.lang)}
+              </span>
+
+              <div class="code-actions">
+
+                <button
+                  type="button"
+                  data-copy-code="${encoded}"
+                  onclick="copyCodeFromButton(this)">
+                  📋 نسخ الكود
+                </button>
+
+              </div>
+
+            </div>
+
+            <div class="code-body">
+              ${syntaxHighlight(block.code)}
+            </div>
+
+          </div>
+        `;
+
+      }
+    );
+
+  return html;
+
+}
+
+
+/* =========================================================
+   COPY CODE
+========================================================= */
+
+async function copyCodeFromButton(button){
+
+  const encoded =
+    button.dataset.copyCode || '';
+
+  await copyText(
+    button,
+    encoded
+  );
+
+}
+
+
+/* =========================================================
+   COPY TEXT
+========================================================= */
+
+async function copyText(button,encoded){
+
+  try{
+
+    const text =
+      decodeURIComponent(encoded);
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+    const oldText =
+      button.innerHTML;
+
+    button.innerHTML =
+      '✅ تم النسخ';
+
+    setTimeout(
+      function(){
+
+        button.innerHTML =
+          oldText;
+
+      },
+      1800
+    );
+
+  }catch(error){
+
+    statusBanner.textContent =
+      '⚠️ لم يتمكن المتصفح من نسخ النص.';
+
+  }
+
+}
+
+
+/* =========================================================
+   SPEECH
+========================================================= */
+
+let activeSpeech = null;
+
+function speakText(button,encoded){
+
+  if(
+    !('speechSynthesis' in window)
+  ){
+
+    statusBanner.textContent =
+      '⚠️ المتصفح لا يدعم قراءة النصوص صوتيًا.';
+
+    return;
+
+  }
+
+  window.speechSynthesis.cancel();
+
+  if(activeSpeech === button){
+
+    activeSpeech = null;
+
+    button.textContent =
+      '🔊 استماع';
+
+    return;
+
+  }
+
+  const text =
+    decodeURIComponent(encoded);
+
+  const utterance =
+    new SpeechSynthesisUtterance(text);
+
+  utterance.lang =
+    /[\u0600-\u06FF]/.test(text)
+      ? 'ar-SA'
+      : 'en-US';
+
+  utterance.rate =
+    .95;
+
+  utterance.onend =
+    function(){
+
+      if(activeSpeech === button){
+
+        activeSpeech = null;
+
+        button.textContent =
+          '🔊 استماع';
+
+      }
+
+    };
+
+  activeSpeech =
+    button;
+
+  button.textContent =
+    '⏹ إيقاف';
+
+  window.speechSynthesis.speak(
+    utterance
+  );
+
+}
+
+
+/* =========================================================
+   TEXTAREA
+========================================================= */
+
+function resizeTextarea(){
+
+  ta.style.height =
+    'auto';
+
+  ta.style.height =
+    Math.min(
+      ta.scrollHeight,
+      150
+    ) + 'px';
+
+}
+
+ta.addEventListener(
+  'input',
+  resizeTextarea
+);
+
+
+/* =========================================================
+   VOICE INPUT
+========================================================= */
+/*
+  تحويل الصوت للنص يتم من خلال MediaRecorder -> /api/transcribe -> Whisper.
+  لا نستخدم SpeechRecognition هنا حتى لا تتكرر الـ interim/final results
+  أو يتم ربط أكثر من handler بنفس زر الميكروفون.
+*/
+
+/* =========================================================
+   EMOJI
+========================================================= */
+
+const EMOJIS = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣',
+  '😊','😇','🙂','🙃','😉','😌','😍','🥰',
+  '😘','😎','🤩','🥳','😏','🤔','🫡','😐',
+  '😶','🙄','😮','😯','😲','😳','🥹','😭',
+  '😢','😡','🤬','😱','😴','🤯','🤗','🫠',
+  '👍','👎','👏','🙌','🔥','❤️','🧡','💛',
+  '💚','💙','💜','🖤','🤍','💯','✨','⭐',
+  '🚀','💻','🖥️','📱','⌨️','🖱️','🧠','🤖',
+  '👨‍💻','👩‍💻','⚡','🛠️','📦','📁','📂','🔐',
+  '🌐','🐛','✅','❌','⚠️','🎯','💡','🎉'
+];
+
+function buildEmojiPicker(){
+
+  emojiGrid.innerHTML = '';
+
+  EMOJIS.forEach(
+    function(emoji){
+
+      const button =
+        document.createElement('button');
+
+      button.type =
+        'button';
+
+      button.className =
+        'emoji-item';
+
+      button.textContent =
+        emoji;
+
+      button.addEventListener(
+        'click',
+        function(){
+
+          insertEmoji(emoji);
+
+        }
+      );
+
+      emojiGrid.appendChild(
+        button
+      );
+
+    }
+  );
+
+}
+
+function insertEmoji(emoji){
+
+  const start =
+    ta.selectionStart;
+
+  const end =
+    ta.selectionEnd;
+
+  const before =
+    ta.value.substring(
+      0,
+      start
+    );
+
+  const after =
+    ta.value.substring(
+      end
+    );
+
+  ta.value =
+    before +
+    emoji +
+    after;
+
+  const cursor =
+    start +
+    emoji.length;
+
+  ta.selectionStart =
+    cursor;
+
+  ta.selectionEnd =
+    cursor;
+
+  resizeTextarea();
+
+  ta.focus();
+
+  emojiPicker.classList.remove(
+    'show'
+  );
+
+}
+
+emojiBtn.addEventListener(
+  'click',
+  function(event){
+
+    event.stopPropagation();
+
+    emojiPicker.classList.toggle(
+      'show'
+    );
+
+  }
+);
+
+document.addEventListener(
+  'click',
+  function(event){
+
+    if(
+      !emojiPicker.contains(event.target) &&
+      event.target !== emojiBtn
+    ){
+
+      emojiPicker.classList.remove(
+        'show'
+      );
+
+    }
+
+  }
+);
+
+buildEmojiPicker();
+
+
+/* =========================================================
+   MODES
+========================================================= */
+
+const MODES = {
+
+  fast:'⚡ سريع',
+
+  reason:'🧠 تفكير عميق',
+
+  code:'💻 خبير برمجة',
+
+  net:'🌐 خبير شبكات',
+
+  sec:'🔐 خبير أمن سيبراني'
+
+};
+
+let currentMode =
+  'code';
+
+modeSelect.addEventListener(
+  'click',
+  function(){
+
+    const keys =
+      Object.keys(MODES);
+
+    const index =
+      keys.indexOf(
+        currentMode
+      );
+
+    currentMode =
+      keys[
+        (index + 1) %
+        keys.length
+      ];
+
+    modeLabel.textContent =
+      MODES[currentMode];
+
+  }
+);
+
+
+/* =========================================================
+   ADD USER MESSAGE
+========================================================= */
+
+function addUserMessage(text, attachments = []){
+
+  const message =
+    document.createElement('div');
+
+  message.className =
+    'msg user';
+
+  const avatar =
+    document.createElement('div');
+
+  avatar.className =
+    'avatar user';
+
+  avatar.textContent =
+    'أ';
+
+  const bubble =
+    document.createElement('div');
+
+  bubble.className =
+    'bubble';
+
+  bubble.textContent =
+    text;
+
+  message.appendChild(
+    avatar
+  );
+
+  message.appendChild(
+    bubble
+  );
+
+  if(Array.isArray(attachments) && attachments.length){
+    const attachmentsBox = document.createElement('div');
+    attachmentsBox.className = 'message-attachments';
+    attachments.forEach(function(item){
+      const chip = document.createElement('div');
+      chip.className = 'message-attachment';
+      if(item.kind === 'image' && item.dataUrl){
+        const img = document.createElement('img');
+        img.src = item.dataUrl;
+        img.alt = item.name || 'image';
+        chip.appendChild(img);
+      }
+      const label = document.createElement('span');
+      label.textContent = '📎 ' + (item.name || 'attachment');
+      chip.appendChild(label);
+      attachmentsBox.appendChild(chip);
+    });
+    message.querySelector('.bubble').appendChild(attachmentsBox);
+  }
+
+  messagesContainer.appendChild(
+    message
+  );
+
+}
+
+
+/* =========================================================
+   ADD AI MESSAGE
+========================================================= */
+
+function createAiMessageElement(){
+
+  const message =
+    document.createElement('div');
+
+  message.className =
+    'msg ai';
+
+  message.innerHTML = `
+
+    <div class="avatar ai">
+
+      <img
+        src="/logo.png"
+        alt="CodeMind AI">
+
+    </div>
+
+    <div class="bubble">
+
+      <div class="ai-text"></div>
+
+    </div>
+
+  `;
+
+  return message;
+
+}
+
+
+/* =========================================================
+   ADD AI MESSAGE
+========================================================= */
+
+function addAiMessage(text){
+
+  const message =
+    createAiMessageElement();
+
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
+
+  textElement.innerHTML =
+    parseMarkdown(text);
+
+  addMessageActions(
+    message,
+    text
+  );
+
+  messagesContainer.appendChild(
+    message
+  );
+
+}
+
+
+/* =========================================================
+   MESSAGE ACTIONS
+========================================================= */
+
+function addMessageActions(
+  message,
+  text
+){
+
+  const existing =
+    message.querySelector(
+      '.msg-actions'
+    );
+
+  if(existing){
+    existing.remove();
+  }
+
+  const encoded =
+    encodeURIComponent(text);
+
+  const actions =
+    document.createElement('div');
+
+  actions.className =
+    'msg-actions';
+
+  const speakButton =
+    document.createElement('button');
+
+  speakButton.type =
+    'button';
+
+  speakButton.textContent =
+    '🔊 استماع';
+
+  speakButton.addEventListener(
+    'click',
+    function(){
+
+      speakText(
+        speakButton,
+        encoded
+      );
+
+    }
+  );
+
+  const copyButton =
+    document.createElement('button');
+
+  copyButton.type =
+    'button';
+
+  copyButton.textContent =
+    '📋 نسخ الرد';
+
+  copyButton.addEventListener(
+    'click',
+    function(){
+
+      copyText(
+        copyButton,
+        encoded
+      );
+
+    }
+  );
+
+  actions.appendChild(
+    speakButton
+  );
+
+  actions.appendChild(
+    copyButton
+  );
+
+  message
+    .querySelector('.bubble')
+    .appendChild(actions);
+
+}
+
+
+/* =========================================================
+   PROJECT UI
+========================================================= */
+
+function addProjectCard(
+  message,
+  project
+){
+
+  if(
+    !project ||
+    !Array.isArray(project.files)
+  ){
+
+    return;
+
+  }
+
+  const card =
+    document.createElement('div');
+
+  card.className =
+    'project-card';
+
+  const projectName =
+    project.name ||
+    'مشروع CodeMind';
+
+  const files =
+    project.files;
+
+  const zipUrl =
+    project.zipUrl ||
+    project.downloadUrl ||
+    '';
+
+  let filesHtml = '';
+
+  files
+    .slice(0,30)
+    .forEach(
+      function(file){
+
+        const name =
+          typeof file === 'string'
+            ? file
+            : (file.path || file.name);
+
+        if(!name){
+          return;
+        }
+
+        filesHtml += `
+          <div class="project-file">
+            📄 ${escapeHtml(name)}
+          </div>
+        `;
+
+      }
+    );
+
+  card.innerHTML = `
+
+    <div class="project-head">
+
+      <div class="project-title">
+        📦 ${escapeHtml(projectName)}
+      </div>
+
+      <div class="project-status">
+        ${zipUrl ? 'جاهز' : 'قيد التجهيز'}
+      </div>
+
+    </div>
+
+    <div class="project-files">
+      ${filesHtml || `
+        <div class="project-file">
+          📁 سيتم عرض ملفات المشروع هنا
+        </div>
+      `}
+    </div>
+
+    <div class="project-actions">
+
+      ${
+        zipUrl
+          ? `
+            <a
+              class="project-btn primary"
+              href="${escapeHtml(zipUrl)}"
+              download>
+              ⬇️ تحميل المشروع ZIP
+            </a>
+          `
+          : `
+            <button
+              class="project-btn"
+              type="button"
+              disabled>
+              ⏳ تجهيز ZIP...
+            </button>
+          `
+      }
+
+    </div>
+  `;
+
+  message
+    .querySelector('.bubble')
+    .appendChild(card);
+
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+function addAiLoading(){
+
+  const message =
+    createAiMessageElement();
+
+  message.id =
+    'loadingMessage';
+
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
+
+  textElement.innerHTML = `
+    جاري التفكير
+    <span class="typing-cursor"></span>
+  `;
+
+  messagesContainer.appendChild(
+    message
+  );
+
+}
+
+
+/* =========================================================
+   TYPING RESPONSE
+========================================================= */
+
+async function typeAiResponse(
+  message,
+  text
+){
+
+  const textElement =
+    message.querySelector(
+      '.ai-text'
+    );
+
+  if(!textElement){
+    return;
+  }
+
+  /*
+    نعرض الرد تدريجيًا.
+    السرعة تتغير حسب طول النص.
+  */
+
+  let visibleText = '';
+
+  const length =
+    text.length;
+
+  let index = 0;
+
+  while(index < length){
+
+    let chunkSize = 2;
+
+    if(length < 300){
+
+      chunkSize = 2;
+
+    }else if(length < 1000){
+
+      chunkSize = 4;
+
+    }else{
+
+      chunkSize = 6;
+
+    }
+
+    const chunk =
+      text.slice(
+        index,
+        index + chunkSize
+      );
+
+    visibleText +=
+      chunk;
+
+    index +=
+      chunkSize;
+
+    textElement.innerHTML =
+      parseMarkdown(
+        visibleText
+      ) +
+      '<span class="typing-cursor"></span>';
+
+    /*
+      Auto-follow حقيقي أثناء كتابة الـAI:
+      لو آخر سطر من الرد وصل تحت الشاشة، نحرك
+      منطقة الشات بنفس مقدار الجزء الخارج منها.
+      كده الشاشة تفضل متابعة البوت مهما طال الرد.
+    */
+    requestAnimationFrame(function(){
+      const chatRect =
+        chatScroll.getBoundingClientRect();
+
+      const textRect =
+        textElement.getBoundingClientRect();
+
+      const bottomPadding = 24;
+      const visibleBottom =
+        chatRect.bottom - bottomPadding;
+
+      if(textRect.bottom > visibleBottom){
+        const neededScroll =
+          textRect.bottom - visibleBottom;
+
+        chatScroll.scrollTop +=
+          neededScroll;
+      }
+    });
+
+    await new Promise(
+      function(resolve){
+
+        setTimeout(
+          resolve,
+          18
+        );
+
+      }
+    );
+
+  }
+
+  textElement.innerHTML =
+    parseMarkdown(text);
+
+  addMessageActions(
+    message,
+    text
+  );
+
+}
+
+
+/* =========================================================
+   SHOW AI RESPONSE
+========================================================= */
+
+async function showAiResponse(
+  text,
+  project
+){
+
+  const loading =
+    document.getElementById(
+      'loadingMessage'
+    );
+
+  let message =
+    loading;
+
+  if(!message){
+
+    message =
+      createAiMessageElement();
+
+    messagesContainer.appendChild(
+      message
+    );
+
+  }
+
+  message.removeAttribute(
+    'id'
+  );
+
+  await typeAiResponse(
+    message,
+    text
+  );
+
+  if(project){
+
+    if(window.CodeMindProjectWorkspace?.render){
+      window.CodeMindProjectWorkspace.render(project);
+    }else{
+      addProjectCard(
+        message,
+        project
+      );
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('codemind:project',{
+        detail:project
+      })
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   ERROR
+========================================================= */
+
+function showAiError(message){
+
+  const loading =
+    document.getElementById(
+      'loadingMessage'
+    );
+
+  if(!loading){
+    return;
+  }
+
+  loading.removeAttribute(
+    'id'
+  );
+
+  const textElement =
+    loading.querySelector(
+      '.ai-text'
+    );
+
+  textElement.innerHTML =
+    '⚠️ ' +
+    escapeHtml(message);
+
+}
+
+
+/* =========================================================
+   CHAT SCROLL
+========================================================= */
+
+/*
+  نستخدم auto-scroll أثناء رد الـAI فقط،
+  حتى يظل آخر جزء من الرد ظاهرًا.
+*/
+function isNearBottom(){
+
+  const distance =
+    chatScroll.scrollHeight -
+    chatScroll.scrollTop -
+    chatScroll.clientHeight;
+
+  return distance < 80;
+
+}
+
+
+/* =========================================================
+   REMOVE LAST USER MESSAGE
+========================================================= */
+
+function removeLastUserMessage(text){
+
+  for(
+    let i = conversationHistory.length - 1;
+    i >= 0;
+    i--
+  ){
+
+    if(
+      conversationHistory[i].role === 'user' &&
+      conversationHistory[i].content === text
+    ){
+
+      conversationHistory.splice(
+        i,
+        1
+      );
+
+      break;
+
+    }
+
+  }
+
+  saveConversationHistory();
+
+}
+
+
+/* =========================================================
+   ATTACHMENTS
+========================================================= */
+
+let pendingAttachments = [];
+const uploadControllers = new Map();
+
+
+
+function formatBytes(bytes){
+  const size = Number(bytes) || 0;
+  if(size < 1024) return size + ' B';
+  if(size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+  return (size / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function renderPendingAttachments(){
+  attachmentsPreview.replaceChildren();
+
+  pendingAttachments.forEach(function(item, index){
+    const chip = document.createElement('div');
+    chip.className = 'attachment-chip';
+
+    if(item.kind === 'image' && item.previewUrl){
+      const img = document.createElement('img');
+      img.src = item.previewUrl;
+      img.alt = item.name;
+      chip.appendChild(img);
+    }else{
+      const icon = document.createElement('span');
+      icon.textContent = '📄';
+      chip.appendChild(icon);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'attachment-info';
+
+    const name = document.createElement('div');
+    name.className = 'attachment-name';
+    name.textContent = item.name;
+
+    const status = document.createElement('div');
+    status.className = 'attachment-status';
+    status.textContent = item.status === 'uploading'
+      ? 'جاري الرفع...'
+      : item.status === 'error'
+        ? 'فشل الرفع'
+        : 'تم الرفع ✓ • ' + formatBytes(item.size);
+
+    if(item.status === 'error') status.classList.add('upload-error');
+    if(item.status === 'ready') status.classList.add('upload-success');
+
+    info.append(name, status);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'attachment-remove';
+    remove.textContent = '×';
+    remove.title = 'حذف المرفق';
+    remove.addEventListener('click', function(){
+      const controller = uploadControllers.get(index);
+      if(controller) controller.abort();
+      if(item.previewUrl && item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+      pendingAttachments.splice(index, 1);
+      renderPendingAttachments();
+    });
+
+    chip.append(info, remove);
+    attachmentsPreview.appendChild(chip);
+  });
+}
+
+async function prepareImageForAI(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return '';
+  try{
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    let quality = 0.82;
+    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+    while(dataUrl.length > 2100000 && quality > 0.45){
+      quality -= 0.08;
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+    return dataUrl.length <= 2300000 ? dataUrl : '';
+  }catch(error){
+    console.warn('AI image preparation failed:', error);
+    return '';
+  }
+}
+
+async function uploadFiles(fileList){
+  const files = Array.from(fileList || []);
+  if(!files.length) return;
+
+  for(const file of files){
+    const localItem = {
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      kind: file.type && file.type.startsWith('image/') ? 'image' : 'file',
+      status: 'uploading',
+      previewUrl: file.type && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+    };
+
+    pendingAttachments.push(localItem);
+    const itemIndex = pendingAttachments.length - 1;
+    renderPendingAttachments();
+
+    const controller = new AbortController();
+    uploadControllers.set(itemIndex, controller);
+
+    try{
+      if(localItem.kind === 'image'){
+        localItem.dataUrl = await prepareImageForAI(file);
+        if(!localItem.dataUrl){
+          throw new Error('تعذر تجهيز الصورة للتحليل. جرّب صورة أصغر.');
+        }
+      }
+      // الصور يتم تجهيزها محليًا وإرسالها مباشرة إلى نموذج الرؤية.
+      // لا نرسل الصورة مرة ثانية إلى /api/upload، لتجنب فشل multipart
+      // ولأن الـAI يحتاج dataUrl الحالي وليس تخزين الصورة على السيرفر.
+      if(localItem.kind === 'image'){
+        localItem.status = 'ready';
+        renderPendingAttachments();
+      }else if(/^(text\/|application\/json$|application\/javascript$|application\/x-javascript$)/i.test(localItem.type) || /\.(txt|json|js|jsx|ts|tsx|html|css|scss|php|py|java|cpp|c|cs|go|rs|dart|sql|xml|ya?ml|md|log)$/i.test(localItem.name)){
+        if(localItem.size > 2 * 1024 * 1024){
+          throw new Error('الملف النصي أكبر من 2MB.');
+        }
+        localItem.content = (await file.text()).slice(0, 2 * 1024 * 1024);
+        localItem.status = 'ready';
+        renderPendingAttachments();
+      }else{
+        const formData = new FormData();
+        formData.append('files', file, file.name);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+
+        const data = await response.json().catch(function(){ return {}; });
+
+        if(!response.ok || !Array.isArray(data.attachments) || !data.attachments.length){
+          throw new Error(data.message || 'تعذر رفع الملف.');
+        }
+
+        const uploaded = data.attachments[0];
+        Object.assign(localItem, uploaded, {
+          name: uploaded.name || localItem.name,
+          type: uploaded.type || localItem.type,
+          size: uploaded.size || localItem.size,
+          kind: uploaded.kind || localItem.kind,
+          status: 'ready'
+        });
+
+        if(localItem.previewUrl && localItem.previewUrl.startsWith('blob:')){
+          URL.revokeObjectURL(localItem.previewUrl);
+        }
+
+        renderPendingAttachments();
+      }
+    }catch(error){
+      if(error.name === 'AbortError'){
+        localItem.status = 'error';
+        localItem.error = 'تم إلغاء الرفع.';
+      }else{
+        localItem.status = 'error';
+        localItem.error = error.message || 'تعذر رفع الملف.';
+      }
+      renderPendingAttachments();
+      statusBanner.textContent = '⚠️ ' + localItem.error;
+    }finally{
+      uploadControllers.delete(itemIndex);
+    }
+  }
+}
+
+function closeAttachmentMenu(){
+  if(!attachmentMenu) return;
+  attachmentMenu.classList.remove('show');
+  attachmentMenu.style.display = 'none';
+  plusBtn.setAttribute('aria-expanded','false');
+}
+
+function openAttachmentMenu(){
+  if(!attachmentMenu) return;
+
+  const willOpen = !attachmentMenu.classList.contains('show');
+
+  if(willOpen){
+    attachmentMenu.classList.add('show');
+    attachmentMenu.style.display = 'flex';
+    attachmentMenu.style.visibility = 'visible';
+    attachmentMenu.style.opacity = '1';
+    plusBtn.setAttribute('aria-expanded','true');
+    if(emojiPicker) emojiPicker.classList.remove('show');
+  }else{
+    closeAttachmentMenu();
+  }
+}
+
+cameraBtn.addEventListener('click', function(){
+  attachmentMenu.classList.remove('show');
+  cameraInput.click();
+});
+
+cameraInput.addEventListener('change', function(){
+  uploadFiles(cameraInput.files);
+  cameraInput.value = '';
+});
+
+chooseFileBtn.addEventListener('click', function(){
+  attachmentMenu.classList.remove('show');
+  fileInput.click();
+});
+
+chooseImageBtn.addEventListener('click', function(){
+  attachmentMenu.classList.remove('show');
+  imageInput.click();
+});
+
+fileInput.addEventListener('change', function(){
+  uploadFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+imageInput.addEventListener('change', function(){
+  uploadFiles(imageInput.files);
+  imageInput.value = '';
+});
+
+document.addEventListener('dragover', function(event){
+  const zone = event.target.closest('.chat-scroll, .input-box');
+  if(!zone) return;
+  if(Array.from(event.dataTransfer?.types || []).includes('Files')){
+    event.preventDefault();
+    inputBox.classList.add('drag-active');
+  }
+});
+
+document.addEventListener('drop', function(event){
+  const zone = event.target.closest('.chat-scroll, .input-box');
+  if(!zone) return;
+  if(Array.from(event.dataTransfer?.types || []).includes('Files')){
+    event.preventDefault();
+    inputBox.classList.remove('drag-active');
+    uploadFiles(event.dataTransfer.files);
+  }
+});
+
+document.addEventListener('dragleave', function(event){
+  if(event.relatedTarget === null) inputBox.classList.remove('drag-active');
+});
+
+document.addEventListener('paste', function(event){
+  const items = Array.from(event.clipboardData?.items || []);
+  const imageItem = items.find(function(item){ return item.type && item.type.startsWith('image/'); });
+  if(!imageItem) return;
+  const file = imageItem.getAsFile();
+  if(file) uploadFiles([file]);
+});
+
+const inputBox = document.querySelector('.input-box');
+
+document.addEventListener('click', function(event){
+  const target = event.target;
+  if(
+    target === plusBtn ||
+    (target && typeof target.closest === 'function' && target.closest('#plusBtn'))
+  ){
+    return;
+  }
+  if(!attachmentMenu.contains(target)){
+    closeAttachmentMenu();
+  }
+});
+
+
+/* =========================================================
+   SEND MESSAGE
+========================================================= */
+
+const CHAT_ID_KEY = 'codemind_active_chat_id_v1';
+let activeChatId = localStorage.getItem(CHAT_ID_KEY) || '';
+
+async function ensureServerChat(firstMessage){
+  if(activeChatId) return activeChatId;
+  try{
+    const response = await fetch('/api/chats',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({
+        title:String(firstMessage || 'محادثة جديدة').trim().slice(0,80) || 'محادثة جديدة',
+        mode:currentMode
+      })
+    });
+    if(!response.ok) return '';
+    const data=await response.json();
+    activeChatId=data.chat?.id || '';
+    if(activeChatId) localStorage.setItem(CHAT_ID_KEY,activeChatId);
+    return activeChatId;
+  }catch(error){
+    console.warn('Server chat unavailable:',error);
+    return '';
+  }
+}
+
+let generating = false;
+
+async function sendMessage(){
+
+  const text =
+    ta.value.trim();
+
+  const readyAttachments =
+    pendingAttachments.filter(function(item){
+      return item.status === 'ready';
+    });
+
+  const failedAttachments =
+    pendingAttachments.filter(function(item){
+      return item.status === 'error';
+    });
+
+  if(!text && !readyAttachments.length){
+
+    ta.focus();
+
+    return;
+
+  }
+
+  if(failedAttachments.length){
+
+    statusBanner.textContent =
+      '⚠️ احذف المرفقات التي فشل رفعها أو أعد رفعها.';
+
+    return;
+
+  }
+
+  if(generating){
+
+    return;
+
+  }
+
+  /*
+    نحفظ مكان المستخدم قبل بدء الرد.
+    ولن نغيره بعد ذلك.
+  */
+
+  const userScrollPosition =
+    chatScroll.scrollTop;
+
+  heroSection.style.display =
+    'none';
+
+  statusBanner.textContent =
+    '';
+
+  emojiPicker.classList.remove(
+    'show'
+  );
+
+  /*
+    History القديمة فقط.
+  */
+
+  const historyForRequest =
+    getContextHistory();
+
+  /*
+    رسالة المستخدم.
+  */
+
+  addUserMessage(text, readyAttachments);
+
+  /*
+    حفظها.
+  */
+
+  const attachmentHistory = readyAttachments.map(function(item){
+    const content = typeof item.content === 'string' ? item.content.slice(0, 18000) : '';
+    return {
+      name: item.name,
+      type: item.type,
+      size: item.size,
+      kind: item.kind,
+      content: content
+    };
+  });
+
+  conversationHistory.push({
+
+    role:'user',
+
+    content:text,
+
+    attachments:attachmentHistory
+
+  });
+
+  conversationHistory =
+    conversationHistory.slice(
+      -MAX_HISTORY_MESSAGES
+    );
+
+  saveConversationHistory();
+
+  /*
+    Loading.
+  */
+
+  addAiLoading();
+
+  /*
+    لا نعمل scroll.
+    نرجع نفس المكان.
+  */
+
+  chatScroll.scrollTop =
+    userScrollPosition;
+
+  ta.value =
+    '';
+
+  pendingAttachments = [];
+  attachmentsPreview.replaceChildren();
+  resizeTextarea();
+
+  generating =
+    true;
+
+  sendBtn.disabled =
+    true;
+
+  sendBtn.textContent =
+    '■';
+
+  try{
+
+    const response =
+      await fetch(
+        '/api/chat',
+        {
+
+          method:'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          body:JSON.stringify({
+
+            message:text,
+
+            chatId:await ensureServerChat(text),
+
+            mode:currentMode,
+
+            history:historyForRequest,
+
+            attachments:readyAttachments.map(function(item){
+              return {
+                name:item.name,
+                type:item.type,
+                size:item.size,
+                kind:item.kind,
+                content:typeof item.content === 'string' ? item.content.slice(0,120000) : '',
+                dataUrl:item.kind === 'image' && typeof item.dataUrl === 'string' ? item.dataUrl : ''
+              };
+            }),
+
+            project:window.CodeMindProjectWorkspace?.getCurrentProject?.() || null
+
+          })
+
+        }
+      );
+
+    const data =
+      await response
+        .json()
+        .catch(
+          function(){
+            return {};
+          }
+        );
+
+    if(!response.ok){
+
+      const errorMessage =
+        data.message ||
+        'حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.';
+
+      statusBanner.textContent =
+        '⚠️ ' +
+        errorMessage;
+
+      removeLastUserMessage(
+        text
+      );
+
+      showAiError(
+        errorMessage
+      );
+
+      return;
+
+    }
+
+    const reply =
+      typeof data.reply === 'string'
+        ? data.reply.trim()
+        : '';
+
+    if(!reply){
+
+      const errorMessage =
+        'وصل رد فارغ من خدمة الذكاء الاصطناعي.';
+
+      statusBanner.textContent =
+        '⚠️ ' +
+        errorMessage;
+
+      removeLastUserMessage(
+        text
+      );
+
+      showAiError(
+        errorMessage
+      );
+
+      return;
+
+    }
+
+    /*
+      Typing effect.
+    */
+
+    await showAiResponse(
+      reply,
+      data.project ||
+      data.generatedProject ||
+      null
+    );
+
+    /*
+      لا نغير موضع الشاشة بعد انتهاء الرد.
+      المستخدم يظل عند بداية رد الـAI.
+    */
+
+    /*
+      حفظ رد AI.
+    */
+
+    conversationHistory.push({
+
+      role:'assistant',
+
+      content:reply
+
+    });
+
+    conversationHistory =
+      conversationHistory.slice(
+        -MAX_HISTORY_MESSAGES
+      );
+
+    saveConversationHistory();
+
+    /*
+      لا يوجد scroll هنا.
+    */
+
+  }catch(error){
+
+    console.error(
+      'CodeMind API Error:',
+      error
+    );
+
+    const errorMessage =
+      error && error.message
+        ? 'تعذر إرسال الرسالة: ' + error.message
+        : 'تعذر الاتصال بالسيرفر. افتح /health للتأكد من حالة Backend.';
+
+    statusBanner.textContent =
+      '⚠️ ' +
+      errorMessage;
+
+    removeLastUserMessage(
+      text
+    );
+
+    showAiError(
+      errorMessage
+    );
+
+  }finally{
+
+    generating =
+      false;
+
+    sendBtn.disabled =
+      false;
+
+    sendBtn.textContent =
+      '➤';
+
+    /*
+      لا نعمل focus إجباري
+      حتى لا تتحرك الشاشة على الموبايل.
+    */
+
+  }
+
+}
+
+
+/* =========================================================
+   SEND
+========================================================= */
+
+sendBtn.addEventListener(
+  'click',
+  sendMessage
+);
+
+
+/* =========================================================
+   ENTER
+========================================================= */
+
+ta.addEventListener(
+  'keydown',
+  function(event){
+
+    if(
+      event.key === 'Enter' &&
+      !event.shiftKey
+    ){
+
+      event.preventDefault();
+
+      sendMessage();
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   NEW CHAT
+========================================================= */
+
+document
+  .getElementById('newChatBtn')
+  .addEventListener(
+    'click',
+    function(){
+
+      messagesContainer.innerHTML =
+        '';
+
+      clearConversationHistory();
+
+      heroSection.style.display =
+        '';
+
+      statusBanner.textContent =
+        '';
+
+      ta.value =
+        '';
+
+      pendingAttachments.forEach(function(item){
+        if(item.previewUrl && item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+      });
+      pendingAttachments = [];
+      attachmentsPreview.replaceChildren();
+
+      resizeTextarea();
+
+      chatScroll.scrollTop =
+        0;
+
+      if(
+        window.innerWidth <= 860
+      ){
+
+        toggleSidebar();
+
+      }
+
+    }
+  );
+
+
+/* =========================================================
+   SUGGESTIONS
+========================================================= */
+
+document
+  .querySelectorAll('.sugg-card')
+  .forEach(
+    function(card){
+
+      card.addEventListener(
+        'click',
+        function(){
+
+          const text =
+            card.dataset.text ||
+            card.querySelector('.d')
+              .textContent
+              .trim();
+
+          ta.value =
+            text;
+
+          resizeTextarea();
+
+          ta.focus();
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================================================
+   MENU
+========================================================= */
+
+document
+  .getElementById('menuBtn')
+  .addEventListener(
+    'click',
+    toggleSidebar
+  );
+
+
+/* =========================================================
+   RENDER SAVED CONVERSATION
+========================================================= */
+
+function renderSavedConversation(){
+
+  messagesContainer.innerHTML =
+    '';
+
+  if(
+    conversationHistory.length === 0
+  ){
+
+    heroSection.style.display =
+      '';
+
+    return;
+
+  }
+
+  heroSection.style.display =
+    'none';
+
+  conversationHistory.forEach(
+    function(item){
+
+      if(item.role === 'user'){
+
+        addUserMessage(
+          item.content,
+          item.attachments || []
+        );
+
+      }
+
+      if(item.role === 'assistant'){
+
+        addAiMessage(
+          item.content
+        );
+
+      }
+
+    }
+  );
+
+  /*
+    عند فتح الصفحة لأول مرة فقط
+    نعرض آخر الرسائل.
+  */
+
+  setTimeout(
+    function(){
+
+      chatScroll.scrollTop =
+        chatScroll.scrollHeight;
+
+    },
+    0
+  );
+
+}
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+let deferredInstallPrompt = null;
+const installAppBtn = document.getElementById('installAppBtn');
+
+function isStandaloneApp(){
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+}
+
+window.addEventListener('beforeinstallprompt', function(event){
+  event.preventDefault();
+  deferredInstallPrompt = event;
+
+  if(installAppBtn && !isStandaloneApp()){
+    installAppBtn.hidden = false;
+  }
+});
+
+if(installAppBtn){
+  installAppBtn.addEventListener('click', async function(){
+    if(!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+
+    try{
+      await deferredInstallPrompt.userChoice;
+    }catch(error){
+      console.warn('Install prompt failed:', error);
+    }
+
+    deferredInstallPrompt = null;
+    installAppBtn.hidden = true;
+  });
+}
+
+window.addEventListener('appinstalled', function(){
+  deferredInstallPrompt = null;
+  if(installAppBtn) installAppBtn.hidden = true;
+});
+
+if(isStandaloneApp() && installAppBtn){
+  installAppBtn.hidden = true;
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/sw.js').catch(function(error){
+      console.warn('CodeMind service worker registration failed:', error);
+    });
+  });
+}
+
+loadConversationHistory();
+
+renderSavedConversation();
+
+resizeTextarea();
+
+</script>
+
+
+<div class="voice-call-screen" id="voiceCallScreen" aria-hidden="true">
+  <div class="voice-call-card">
+    <div class="voice-call-top">
+      <button class="voice-call-close" id="voiceCallClose" type="button" aria-label="إغلاق">×</button>
+      <div class="voice-call-title">CodeMind AI</div>
+      <span class="voice-call-live">صوتي</span>
+    </div>
+    <div class="voice-call-center">
+      <div class="voice-orb" id="voiceOrb"><div class="voice-orb-core">AI</div></div>
+      <div class="voice-call-status" id="voiceCallStatus">جاهز للمكالمة</div>
+      <div class="voice-call-hint" id="voiceCallHint">اضغط الميكروفون وتكلم</div>
+    </div>
+    <div class="voice-call-actions">
+      <button class="voice-call-action" id="voiceCallMute" type="button" aria-label="كتم الميكروفون">🎙️</button>
+      <button class="voice-call-action end" id="voiceCallEnd" type="button" aria-label="إنهاء المكالمة">☎</button>
+      <button class="voice-call-action" id="voiceCallSpeaker" type="button" aria-label="إيقاف الصوت">🔊</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const mic=document.getElementById("micBtn"), call=document.getElementById("voiceCallBtn"), screen=document.getElementById("voiceCallScreen");
+  const close=document.getElementById("voiceCallClose"), end=document.getElementById("voiceCallEnd"), mute=document.getElementById("voiceCallMute"), speaker=document.getElementById("voiceCallSpeaker");
+  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu");
+  const R=window.SpeechRecognition||window.webkitSpeechRecognition, synth=window.speechSynthesis;
+  if(!mic||!ta)return;
+  let callRec=null,callListening=false,inCall=false,muted=false,speaking=false,history=[],voice=null,recordingBase="";
+  function micState(on){mic.classList.toggle("recording",on);}
+  function orbState(s){if(!orb)return;orb.classList.remove("listening","thinking","speaking");if(s)orb.classList.add(s);}
+  function callState(a,b){if(status)status.textContent=a;if(hint)hint.textContent=b||"";}
+  function pickVoice(){if(!synth)return null;const v=synth.getVoices();return v.find(x=>x.lang==="ar-EG")||v.find(x=>/^ar[-_]/i.test(x.lang))||v[0]||null;}
+  if(synth){voice=pickVoice();synth.addEventListener("voiceschanged",()=>voice=pickVoice());}
+  function stopCallRec(){callListening=false;try{if(callRec)callRec.stop()}catch(e){}callRec=null;micState(false);}
+  function listenCall(){
+    if(!inCall||muted||speaking)return;
+    if(!R){callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");return;}
+    stopCallRec();callRec=new R();callRec.lang="ar-EG";callRec.continuous=false;callRec.interimResults=true;callRec.maxAlternatives=1;
+    callRec.onstart=()=>{callListening=true;micState(true);orbState("listening");callState("سامعك...","اتكلم بشكل طبيعي");};
+    callRec.onresult=e=>{let text="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)text+=e.results[i][0].transcript;}if(text.trim())sendCall(text.trim());};
+    callRec.onerror=()=>{stopCallRec();if(inCall)callState("جاهز","اتكلم تاني");};
+    callRec.onend=()=>{callListening=false;micState(false);if(inCall&&!speaking&&!muted)setTimeout(listenCall,300);};
+    try{callRec.start()}catch(e){}
+  }
+  async function sendCall(text){
+    stopCallRec();orbState("thinking");callState("CodeMind بيفكر...","جاري تجهيز الرد");
+    try{
+      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({message:text,mode:"code",history:history.slice(-20),webSearch:false})});
+      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"request_failed");
+      const reply=String(d.reply||"").trim();if(!reply)throw new Error("empty_reply");
+      history.push({role:"user",content:text},{role:"assistant",content:reply});history=history.slice(-20);speak(reply);
+    }catch(e){callState("حصل خطأ في الاتصال","حاول مرة أخرى.");orbState("");if(inCall)setTimeout(listenCall,900);}
+  }
+  function speak(text){
+    if(!inCall)return;
+    if(!synth){callState("الرد جاهز","الصوت غير مدعوم على الجهاز.");return;}
+    synth.cancel();
+    const clean=String(text).replace(/[*_#>]/g," ");
+    const u=new SpeechSynthesisUtterance(clean);u.lang="ar-EG";u.rate=1;if(voice)u.voice=voice;
+    speaking=true;orbState("speaking");callState("CodeMind بيرد عليك...","اسمع الرد");
+    u.onend=()=>{speaking=false;if(inCall){orbState("");callState("جاهز","اتكلم تاني");setTimeout(listenCall,250);}};
+    u.onerror=u.onend;synth.speak(u);
+  }
+  function openCall(){inCall=true;muted=false;history=[];screen.classList.add("open");screen.setAttribute("aria-hidden","false");callState("المكالمة بدأت","اتكلم مع CodeMind");listenCall();}
+  function closeCall(){inCall=false;stopCallRec();try{if(synth)synth.cancel()}catch(e){}screen.classList.remove("open");screen.setAttribute("aria-hidden","true");orbState("");}
+  if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall();});
+  if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
+  if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم");orbState("");}else listenCall();});
+  if(speaker)speaker.addEventListener("click",()=>{if(synth&&synth.speaking){synth.cancel();speaking=false;orbState("");callState("جاهز","اتكلم تاني");setTimeout(listenCall,250);}});
+  let mediaRecorder=null;
+  let mediaChunks=[];
+  let mediaStream=null;
+  let mediaTimer=null;
+
+  function insertTranscript(text){
+    const cleaned=String(text||"").trim();
+    if(!cleaned)return;
+    ta.value=[recordingBase,cleaned].filter(Boolean).join(" ");
     ta.dispatchEvent(new Event("input",{bubbles:true}));
     ta.focus();
   }
