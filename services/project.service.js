@@ -56,6 +56,49 @@ function balancedObjects(text) {
   return results;
 }
 
+
+function recoverProjectFromMarkdown(raw) {
+  const text = String(raw || '');
+  const blocks = [];
+  const re = /\`\`\`(?:html?|css|javascript|js|jsx|tsx|json|typescript|ts)?\\s*\\n([\\s\\S]*?)\`\`\`/gi;
+  let match;
+  while ((match = re.exec(text))) {
+    const content = match[1].trim();
+    if (content) blocks.push(content);
+  }
+  if (!blocks.length) return null;
+
+  const paths = [];
+  const structure = text.match(/##\\s*Project Structure[\\s\\S]*?(?=##\\s|$)/i)?.[0] || '';
+  const pathRe = /(?:├─|│\\s*├─|\\|--|--\\s*)([A-Za-z0-9_./-]+(?:\\.[A-Za-z0-9]+)?)/g;
+  let p;
+  while ((p = pathRe.exec(structure))) {
+    const path = sanitizeProjectPath(p[1]);
+    if (path && /\\.[A-Za-z0-9]+$/.test(path)) paths.push(path);
+  }
+
+  const preferred = ['index.html','style.css','script.js','src/App.jsx','src/main.jsx','src/index.css','package.json','vite.config.js'];
+  const selectedPaths = [...paths];
+  for (const path of preferred) if (selectedPaths.length < blocks.length && !selectedPaths.includes(path)) selectedPaths.push(path);
+
+  const files = blocks.map((content, i) => {
+    const path = selectedPaths[i] || (
+      /<html|<!doctype/i.test(content) ? 'index.html' :
+      /(^|\\n)\\s*[{.]?[#@a-z-]+\\s*[{]/i.test(content) ? 'style.css' :
+      /(^|\\n)\\s*(import |const |let |function |document\\.)/i.test(content) ? 'script.js' :
+      `file-${i + 1}.txt`
+    );
+    return { path: sanitizeProjectPath(path), content };
+  });
+
+  const project = normalizeProject({
+    name: 'codemind-project',
+    description: 'Recovered project files',
+    files
+  });
+  return project;
+}
+
 export function parseProjectResponse(raw) {
   if (typeof raw !== 'string' || !raw.trim()) return { reply: '', project: null };
   const text = raw.trim();
@@ -77,6 +120,8 @@ export function parseProjectResponse(raw) {
       // Continue with the next candidate.
     }
   }
+  const recovered = recoverProjectFromMarkdown(text);
+  if (recovered) return { reply: 'تم استخراج ملفات المشروع وتجهيزها للتحميل.', project: recovered };
   console.error('Project manifest parsing failed: no valid project.files found');
   return { reply: text, project: null };
 }
