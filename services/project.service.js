@@ -60,7 +60,7 @@ function balancedObjects(text) {
 function recoverProjectFromMarkdown(raw) {
   const text = String(raw || '');
   const blocks = [];
-  const re = /\`\`\`(?:html?|css|javascript|js|jsx|tsx|json|typescript|ts)?\s*\n([\s\\S]*?)\`\`\`/gi;
+  const re = /\`\`\`(?:html?|css|javascript|js|jsx|tsx|json|typescript|ts)?\s*\n([\s\S]*?)\`\`\`/gi;
   let match;
   while ((match = re.exec(text))) {
     const content = match[1].trim();
@@ -69,8 +69,8 @@ function recoverProjectFromMarkdown(raw) {
   if (!blocks.length) return null;
 
   const paths = [];
-  const structure = text.match(/##\s*Project Structure[\s\\S]*?(?=##\s|$)/i)?.[0] || '';
-  const pathRe = /(?:├─|│\s*├─|\\|--|--\s*)([A-Za-z0-9_./-]+(?:\.[A-Za-z0-9]+)?)/g;
+  const structure = text.match(/##\s*Project Structure[\s\S]*?(?=##\s|$)/i)?.[0] || '';
+  const pathRe = /(?:├─|│\s*├─|\|--|--\s*)([A-Za-z0-9_./-]+(?:\.[A-Za-z0-9]+)?)/g;
   let p;
   while ((p = pathRe.exec(structure))) {
     const path = sanitizeProjectPath(p[1]);
