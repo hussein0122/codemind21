@@ -246,7 +246,7 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
   try {
     const { message, mode = 'code', history = [], attachments = [], project: currentProject = null, chatId = null, webSearch = false } = req.body || {};
     if (!isAiConfigured()) return res.status(503).json({ error: 'ai_not_configured', message: 'GROQ_API_KEY غير موجود في إعدادات Vercel.' });
-    if (typeof message !== 'string' || !message.trim() || message.length > 20000) {
+    if (typeof message !== 'string' || message.length > 20000) {
       return res.status(400).json({ error: 'invalid_request', message: 'أرسل رسالة صحيحة.' });
     }
 
@@ -293,9 +293,14 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
         }
       } catch (error) { console.warn('Web search failed:', error?.message || error); }
     }
+    const attachmentOnlyPrompt = !message.trim() && safeAttachments.length
+      ? (imageAttachments.length
+        ? 'حلل الصورة المرفقة بدقة واشرح ما تراه فيها. إذا كانت تحتوي على كود أو خطأ برمجي، اقرأه واشرح المشكلة والحل. إذا كانت تحتوي على نص، استخرج النص المهم واشرحه. لا تقل إنك لا تستطيع رؤية الصورة إذا كانت الصورة مرفقة فعليًا.'
+        : 'حلل الملفات المرفقة ووضح محتواها وما يمكنني الاستفادة منه. إذا كانت ملفات كود، راجعها واشرح أهم ما فيها وأي أخطاء واضحة.')
+      : message.trim();
     const currentContent = projectRequest
-      ? buildProjectPrompt(message.trim(), existingProject) + buildAttachmentContext(safeAttachments) + webContext
-      : message.trim() + buildAttachmentContext(safeAttachments) + webContext;
+      ? buildProjectPrompt(attachmentOnlyPrompt, existingProject) + buildAttachmentContext(safeAttachments) + webContext
+      : attachmentOnlyPrompt + buildAttachmentContext(safeAttachments) + webContext;
     messages.push({ role: 'user', content: currentContent });
 
     const completion = await createCompletion({ messages, mode, structured: projectRequest, imageAttachments });
