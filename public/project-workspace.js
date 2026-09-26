@@ -164,6 +164,21 @@
     dialog.addEventListener('close', () => dialog.remove(), { once: true });
   }
 
-  window.CodeMindProjectWorkspace = { render, saveProject, downloadZip, getCurrentProject: () => currentProject };
+  function getCurrentProject(){
+    if(currentProject && Array.isArray(currentProject.files) && currentProject.files.length) return currentProject;
+    try{
+      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const latest=Array.isArray(saved) ? saved[0] : null;
+      if(latest && Array.isArray(latest.files) && latest.files.length){
+        currentProject=latest;
+        return latest;
+      }
+    }catch(error){
+      console.warn('Project restore failed:',error);
+    }
+    return null;
+  }
+
+  window.CodeMindProjectWorkspace = { render, saveProject, downloadZip, getCurrentProject };
   window.addEventListener('codemind:project', (event) => render(event.detail));
 })();
