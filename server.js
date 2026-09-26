@@ -314,16 +314,6 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
   }
 });
 
-// Inject the workspace scripts without requiring a rewrite of the large legacy HTML file.
-app.get('/', async (req, res, next) => {
-  try {
-    const html = await readFile(path.join(__dirname, 'public', 'index.html'), 'utf8');
-    const scripts = '<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/project-workspace.js"></script><script src="/account.js"></script>';
-    res.type('html').send(html.replace('</body>', `${scripts}</body>`));
-  } catch (error) {
-    next(error);
-  }
-});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use((error, req, res, next) => {
   console.error('Request failed:', error);
