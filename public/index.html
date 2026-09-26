@@ -1067,7 +1067,12 @@ button{
   position:fixed;
   inset:0;
   background:rgba(0,0,0,.5);
-  z-index:20;
+  z-index:1500;
+}
+
+body.voice-call-active .input-zone{
+  visibility:hidden !important;
+  pointer-events:none !important;
 }
 
 /* =========================================================
@@ -1078,7 +1083,7 @@ button{
 
   .sidebar{
     position:fixed;
-    z-index:30;
+    z-index:2000;
     top:0;
     bottom:0;
     right:0;
@@ -3847,169 +3852,137 @@ resizeTextarea();
 </div>
 <script>
 (() => {
-  const mic=document.getElementById("micBtn"), call=document.getElementById("voiceCallBtn"), screen=document.getElementById("voiceCallScreen");
-  const close=document.getElementById("voiceCallClose"), end=document.getElementById("voiceCallEnd"), mute=document.getElementById("voiceCallMute"), speaker=document.getElementById("voiceCallSpeaker");
-  const orb=document.getElementById("voiceOrb"), status=document.getElementById("voiceCallStatus"), hint=document.getElementById("voiceCallHint"), ta=document.getElementById("ta"), menu=document.getElementById("attachmentMenu");
-  const R=window.SpeechRecognition||window.webkitSpeechRecognition, synth=window.speechSynthesis;
+  const mic=document.getElementById("micBtn"),call=document.getElementById("voiceCallBtn"),screen=document.getElementById("voiceCallScreen");
+  const close=document.getElementById("voiceCallClose"),end=document.getElementById("voiceCallEnd"),mute=document.getElementById("voiceCallMute"),speaker=document.getElementById("voiceCallSpeaker");
+  const orb=document.getElementById("voiceOrb"),status=document.getElementById("voiceCallStatus"),hint=document.getElementById("voiceCallHint"),ta=document.getElementById("ta"),menu=document.getElementById("attachmentMenu");
+  const R=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;
   if(!mic||!ta)return;
-  let callRec=null,callListening=false,inCall=false,muted=false,speaking=false,history=[],voice=null,recordingBase="";
-  function micState(on){mic.classList.toggle("recording",on);}
-  function orbState(s){if(!orb)return;orb.classList.remove("listening","thinking","speaking");if(s)orb.classList.add(s);}
-  function callState(a,b){if(status)status.textContent=a;if(hint)hint.textContent=b||"";}
-  function pickVoice(){if(!synth)return null;const v=synth.getVoices();return v.find(x=>x.lang==="ar-EG")||v.find(x=>/^ar[-_]/i.test(x.lang))||v[0]||null;}
-  if(synth){voice=pickVoice();synth.addEventListener("voiceschanged",()=>voice=pickVoice());}
-  function stopCallRec(){callListening=false;try{if(callRec)callRec.stop()}catch(e){}callRec=null;micState(false);}
-  function listenCall(){
-    if(!inCall||muted||speaking)return;
-    if(!R){callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");return;}
-    stopCallRec();callRec=new R();callRec.lang="ar-EG";callRec.continuous=false;callRec.interimResults=true;callRec.maxAlternatives=1;
-    callRec.onstart=()=>{callListening=true;micState(true);orbState("listening");callState("سامعك...","اتكلم بشكل طبيعي");};
-    callRec.onresult=e=>{let text="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)text+=e.results[i][0].transcript;}if(text.trim())sendCall(text.trim());};
-    callRec.onerror=()=>{stopCallRec();if(inCall)callState("جاهز","اتكلم تاني");};
-    callRec.onend=()=>{callListening=false;micState(false);if(inCall&&!speaking&&!muted)setTimeout(listenCall,300);};
-    try{callRec.start()}catch(e){}
+  let rec=null,inCall=false,muted=false,speaking=false,history=[],voice=null,finalText="",silenceTimer=null,starting=false;
+  const state=(s)=>{if(!orb)return;orb.classList.remove("listening","thinking","speaking");if(s)orb.classList.add(s)};
+  const callState=(a,b)=>{if(status)status.textContent=a;if(hint)hint.textContent=b||""};
+  const micState=(on)=>mic.classList.toggle("recording",on);
+  function pickVoice(){
+    if(!synth)return null;
+    const v=synth.getVoices()||[],a=v.filter(x=>/^ar[-_]/i.test(x.lang||""));
+    return a.find(x=>/^ar[-_]EG/i.test(x.lang||""))||a.find(x=>/google/i.test(x.name||""))||a[0]||v[0]||null;
+  }
+  if(synth){voice=pickVoice();synth.addEventListener("voiceschanged",()=>voice=pickVoice())}
+  function clearTimer(){if(silenceTimer){clearTimeout(silenceTimer);silenceTimer=null}}
+  function stopRec(){
+    clearTimer();starting=false;
+    try{rec&&rec.stop()}catch(e){}
+    rec=null;micState(false);
+  }
+  function listen(){
+    if(!inCall||muted||speaking||starting)return;
+    if(!R){callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");return}
+    stopRec();finalText="";starting=true;
+    const r=new R();rec=r;r.lang="ar-EG";r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
+    r.onstart=()=>{starting=false;if(rec!==r)return;micState(true);state("listening");callState("سامعك...","خد وقتك واتكلم براحتك")};
+    r.onresult=(e)=>{
+      if(rec!==r)return;
+      let gotFinal=false;
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const t=(e.results[i][0]?.transcript||"").trim();
+        if(t&&e.results[i].isFinal){finalText+=(finalText?" ":"")+t;gotFinal=true}
+      }
+      if(finalText)callState("سامعك...","مستنيك تكمّل كلامك");
+      if(gotFinal){
+        clearTimer();
+        silenceTimer=setTimeout(()=>{
+          const text=finalText.trim();finalText="";
+          if(text)sendCall(text);
+        },1400);
+      }
+    };
+    r.onerror=(e)=>{
+      if(rec!==r)return;
+      stopRec();
+      if(inCall&&!speaking&&!muted&&e?.error!=="aborted"){callState("جاهز","اتكلم تاني لما تكون جاهز");setTimeout(listen,700)}
+    };
+    r.onend=()=>{
+      if(rec!==r)return;
+      rec=null;starting=false;micState(false);
+      if(finalText.trim()&&!speaking&&!muted){
+        const text=finalText.trim();finalText="";clearTimer();sendCall(text);return;
+      }
+      if(inCall&&!speaking&&!muted)setTimeout(listen,450);
+    };
+    try{r.start()}catch(e){starting=false;rec=null;micState(false);setTimeout(listen,600)}
   }
   async function sendCall(text){
-    stopCallRec();orbState("thinking");callState("CodeMind بيفكر...","جاري تجهيز الرد");
+    if(!text||!inCall)return;
+    stopRec();state("thinking");callState("CodeMind بيفكر...","لحظة وأنا أجهز الرد");
     try{
       const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({message:text,mode:"code",history:history.slice(-20),webSearch:false})});
       const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"request_failed");
       const reply=String(d.reply||"").trim();if(!reply)throw new Error("empty_reply");
       history.push({role:"user",content:text},{role:"assistant",content:reply});history=history.slice(-20);speak(reply);
-    }catch(e){callState("حصل خطأ في الاتصال","حاول مرة أخرى.");orbState("");if(inCall)setTimeout(listenCall,900);}
+    }catch(e){state("");callState("حصل خطأ في الاتصال","حاول مرة تانية.");if(inCall)setTimeout(listen,1000)}
   }
   function speak(text){
     if(!inCall)return;
-    if(!synth){callState("الرد جاهز","الصوت غير مدعوم على الجهاز.");return;}
-    synth.cancel();
-    const clean=String(text).replace(/[*_#>]/g," ");
-    const u=new SpeechSynthesisUtterance(clean);u.lang="ar-EG";u.rate=1;if(voice)u.voice=voice;
-    speaking=true;orbState("speaking");callState("CodeMind بيرد عليك...","اسمع الرد");
-    u.onend=()=>{speaking=false;if(inCall){orbState("");callState("جاهز","اتكلم تاني");setTimeout(listenCall,250);}};
+    if(!synth){callState("الرد جاهز","الصوت غير مدعوم على الجهاز.");return}
+    try{synth.cancel()}catch(e){}
+    const clean=String(text).replace(/[*_#>]/g," ").replace(/\s+/g," ").trim();
+    const u=new SpeechSynthesisUtterance(clean);u.lang="ar-EG";u.rate=.92;u.pitch=1.02;u.volume=.96;if(voice)u.voice=voice;
+    speaking=true;state("speaking");callState("CodeMind بيرد عليك...","اسمع الرد براحتك");
+    u.onend=()=>{speaking=false;if(inCall){state("");callState("جاهز","اتكلم لما تخلص أفكارك");setTimeout(listen,500)}};
     u.onerror=u.onend;synth.speak(u);
   }
-  function openCall(){inCall=true;muted=false;history=[];screen.classList.add("open");screen.setAttribute("aria-hidden","false");callState("المكالمة بدأت","اتكلم مع CodeMind");listenCall();}
-  function closeCall(){inCall=false;stopCallRec();try{if(synth)synth.cancel()}catch(e){}screen.classList.remove("open");screen.setAttribute("aria-hidden","true");orbState("");}
-  if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall();});
-  if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
-  if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم");orbState("");}else listenCall();});
-  if(speaker)speaker.addEventListener("click",()=>{if(synth&&synth.speaking){synth.cancel();speaking=false;orbState("");callState("جاهز","اتكلم تاني");setTimeout(listenCall,250);}});
-  let mediaRecorder=null;
-  let mediaChunks=[];
-  let mediaStream=null;
-  let mediaTimer=null;
-
-  function insertTranscript(text){
-    const cleaned=String(text||"").trim();
-    if(!cleaned)return;
-    ta.value=[recordingBase,cleaned].filter(Boolean).join(" ");
-    ta.dispatchEvent(new Event("input",{bubbles:true}));
-    ta.focus();
+  function openCall(){
+    inCall=true;muted=false;history=[];finalText="";
+    document.body.classList.add("voice-call-active");screen.classList.add("open");screen.setAttribute("aria-hidden","false");
+    callState("المكالمة بدأت","خد وقتك... أنا سامعك");setTimeout(listen,450);
   }
-
+  function closeCall(){
+    inCall=false;stopRec();finalText="";try{synth&&synth.cancel()}catch(e){}speaking=false;
+    document.body.classList.remove("voice-call-active");screen.classList.remove("open");screen.setAttribute("aria-hidden","true");state("");
+  }
+  if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall()});
+  if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
+  if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();state("");callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم")}else setTimeout(listen,350)});
+  if(speaker)speaker.addEventListener("click",()=>{if(synth&&synth.speaking){try{synth.cancel()}catch(e){}speaking=false;state("");callState("جاهز","اتكلم لما تكون جاهز");setTimeout(listen,450)}});
+  let mediaRecorder=null,mediaChunks=[],mediaStream=null,mediaTimer=null,recordingBase="";
+  function insertTranscript(text){const cleaned=String(text||"").trim();if(!cleaned)return;ta.value=[recordingBase,cleaned].filter(Boolean).join(" ");ta.dispatchEvent(new Event("input",{bubbles:true}));ta.focus()}
   async function transcribeRecordedAudio(blob){
-    if(!blob || !blob.size) return;
-    if(typeof statusBanner!=="undefined" && statusBanner){
-      statusBanner.textContent="🧠 بحوّل صوتك لنص بدقة...";
-    }
+    if(!blob||!blob.size)return;
+    if(typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent="🧠 بحوّل صوتك لنص بدقة...";
     try{
-      if(blob.size > 4 * 1024 * 1024){
-        throw new Error("audio_too_large");
-      }
-      const response=await fetch("/api/transcribe",{
-        method:"POST",
-        headers:{"Content-Type":blob.type||"audio/webm"},
-        body:blob
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(data.message||"transcription_failed");
-      insertTranscript(data.text||"");
-      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="";
+      if(blob.size>4*1024*1024)throw new Error("audio_too_large");
+      const response=await fetch("/api/transcribe",{method:"POST",headers:{"Content-Type":blob.type||"audio/webm"},body:blob});
+      const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||"transcription_failed");
+      insertTranscript(data.text||"");if(typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent="";
     }catch(error){
       console.error("Whisper transcription failed:",error);
-      if(typeof statusBanner!=="undefined" && statusBanner){
-        statusBanner.textContent=error?.message==="audio_too_large"
-          ? "⚠️ التسجيل طويل جدًا. اتكلم لمدة أقصر وحاول مرة أخرى."
-          : "⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
-      }
-    }finally{
-      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
-      mediaStream=null;
-    }
+      if(typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent=error?.message==="audio_too_large"?"⚠️ التسجيل طويل جدًا. اتكلم لمدة أقصر وحاول مرة أخرى.":"⚠️ تعذر تحويل الصوت لنص. جرب الميكروفون مرة أخرى.";
+    }finally{try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}mediaStream=null}
   }
-
-  function stopMediaRecording(){
-    if(mediaTimer){clearTimeout(mediaTimer);mediaTimer=null;}
-    try{mediaRecorder?.stop()}catch{}
-  }
-
+  function stopMediaRecording(){if(mediaTimer){clearTimeout(mediaTimer);mediaTimer=null}try{mediaRecorder?.stop()}catch{}}
   async function startMediaRecording(){
-    if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)return false;
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return false;
     try{
-      if(!window.isSecureContext){
-        throw new Error("insecure_context");
-      }
-      mediaStream=await navigator.mediaDevices.getUserMedia({audio:{
-        channelCount:1,
-        echoCancellation:true,
-        noiseSuppression:true,
-        autoGainControl:true
-      }});
+      if(!window.isSecureContext)throw new Error("insecure_context");
+      mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
       const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(type=>MediaRecorder.isTypeSupported(type));
-      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000});
-      mediaChunks=[];
-      mediaRecorder.ondataavailable=(event)=>{if(event.data?.size)mediaChunks.push(event.data)};
-      mediaRecorder.onstop=()=>{
-        const blob=new Blob(mediaChunks,{type:mediaRecorder?.mimeType||"audio/webm"});
-        mediaChunks=[];
-        void transcribeRecordedAudio(blob);
-      };
-      mediaRecorder.start();
-      micState(true);
-      if(typeof statusBanner!=="undefined" && statusBanner)statusBanner.textContent="🎙️ سامعك... اتكلم بوضوح، واضغط الميك مرة ثانية لما تخلص.";
-      mediaTimer=setTimeout(stopMediaRecording,20000);
-      return true;
+      mediaRecorder=new MediaRecorder(mediaStream,preferred?{mimeType:preferred,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000});mediaChunks=[];
+      mediaRecorder.ondataavailable=e=>{if(e.data?.size)mediaChunks.push(e.data)};
+      mediaRecorder.onstop=()=>{const blob=new Blob(mediaChunks,{type:mediaRecorder?.mimeType||"audio/webm"});mediaChunks=[];void transcribeRecordedAudio(blob)};
+      mediaRecorder.start();micState(true);
+      if(typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent="🎙️ سامعك... اتكلم براحتك واضغط الميك مرة ثانية لما تخلص.";
+      mediaTimer=setTimeout(stopMediaRecording,20000);return true;
     }catch(error){
-      console.warn("MediaRecorder microphone unavailable:",error);
-      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}
-      mediaStream=null;
-      if(typeof statusBanner!=="undefined" && statusBanner){
-        if(error?.message==="insecure_context"){
-          statusBanner.textContent="⚠️ الميكروفون يحتاج HTTPS. افتح نسخة الموقع على رابط Vercel الآمن.";
-        }else if(error?.name==="NotAllowedError"){
-          statusBanner.textContent="⚠️ المتصفح منع الميكروفون. افتح إعدادات الموقع > الميكروفون > سماح، ثم أعد المحاولة.";
-        }else if(error?.name==="NotFoundError"){
-          statusBanner.textContent="⚠️ لم يتم العثور على ميكروفون في الجهاز.";
-        }else if(error?.name==="NotReadableError"){
-          statusBanner.textContent="⚠️ الميكروفون مستخدم بواسطة تطبيق آخر. أغلقه وحاول مرة أخرى.";
-        }else{
-          statusBanner.textContent="⚠️ تعذر فتح الميكروفون: "+(error?.message||"خطأ غير معروف");
-        }
-      }
+      try{mediaStream?.getTracks().forEach(track=>track.stop())}catch{}mediaStream=null;
+      if(typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent="⚠️ تعذر تشغيل تسجيل الميكروفون. اسمح بالميكروفون من إعدادات الموقع ثم جرّب مرة أخرى.";
       return false;
     }
   }
-
-  // Normal microphone: MediaRecorder -> /api/transcribe -> Whisper only.
-  // Voice-call speech recognition is isolated above so it can never duplicate this handler.
   mic.addEventListener("click",async()=>{
     if(inCall)return;
-
-    if(mediaRecorder && mediaRecorder.state==="recording"){
-      stopMediaRecording();
-      micState(false);
-      return;
-    }
-
-    recordingBase=ta.value.trim();
-    const started=await startMediaRecording();
-    if(!started){
-      if(typeof statusBanner!=="undefined" && statusBanner){
-        statusBanner.textContent="⚠️ تعذر تشغيل تسجيل الميكروفون. اسمح بالميكروفون من إعدادات الموقع ثم جرّب مرة أخرى.";
-      }
-    }
+    if(mediaRecorder&&mediaRecorder.state==="recording"){stopMediaRecording();micState(false);return}
+    recordingBase=ta.value.trim();const started=await startMediaRecording();
+    if(!started&&typeof statusBanner!=="undefined"&&statusBanner)statusBanner.textContent="⚠️ تعذر تشغيل تسجيل الميكروفون.";
   });
-
 })();
 </script>
 <script>
