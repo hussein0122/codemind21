@@ -3857,69 +3857,188 @@ resizeTextarea();
   const orb=document.getElementById("voiceOrb"),status=document.getElementById("voiceCallStatus"),hint=document.getElementById("voiceCallHint"),ta=document.getElementById("ta"),menu=document.getElementById("attachmentMenu");
   const R=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;
   if(!mic||!ta)return;
-  let rec=null,inCall=false,muted=false,speaking=false,history=[],voice=null,finalText="",silenceTimer=null,starting=false;
+  let rec=null,inCall=false,muted=false,speaking=false,history=[],voice=null,finalText="",silenceTimer=null,starting=false,sendInProgress=false,listenTimer=null,callTurnId=0;
+
   const state=(s)=>{if(!orb)return;orb.classList.remove("listening","thinking","speaking");if(s)orb.classList.add(s)};
   const callState=(a,b)=>{if(status)status.textContent=a;if(hint)hint.textContent=b||""};
   const micState=(on)=>mic.classList.toggle("recording",on);
-  function pickVoice(){
-    if(!synth)return null;
-    const v=synth.getVoices()||[],a=v.filter(x=>/^ar[-_]/i.test(x.lang||""));
-    return a.find(x=>/^ar[-_]EG/i.test(x.lang||""))||a.find(x=>/google/i.test(x.name||""))||a[0]||v[0]||null;
-  }
-  if(synth){voice=pickVoice();synth.addEventListener("voiceschanged",()=>voice=pickVoice())}
+
   function clearTimer(){if(silenceTimer){clearTimeout(silenceTimer);silenceTimer=null}}
+  function clearListenTimer(){if(listenTimer){clearTimeout(listenTimer);listenTimer=null}}
+
   function stopRec(){
-    clearTimer();starting=false;
-    try{rec&&rec.stop()}catch(e){}
-    rec=null;micState(false);
+    clearTimer();
+    clearListenTimer();
+    starting=false;
+    try{rec&&rec.abort()}catch(e){}
+    rec=null;
+    micState(false);
   }
+
+  function scheduleListen(delay=500){
+    clearListenTimer();
+    if(!inCall||muted||speaking||starting||sendInProgress)return;
+    const turn=callTurnId;
+    listenTimer=setTimeout(()=>{
+      listenTimer=null;
+      if(turn===callTurnId) listen();
+    },delay);
+  }
+
   function listen(){
-    if(!inCall||muted||speaking||starting)return;
-    if(!R){callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");return}
-    stopRec();finalText="";starting=true;
-    const r=new R();rec=r;r.lang="ar-EG";r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
-    r.onstart=()=>{starting=false;if(rec!==r)return;micState(true);state("listening");callState("سامعك...","خد وقتك واتكلم براحتك")};
+    if(!inCall||muted||speaking||starting||sendInProgress)return;
+    if(!R){
+      callState("التعرف على الصوت غير مدعوم","جرّب Chrome من الموقع.");
+      return;
+    }
+
+    stopRec();
+    if(!inCall||muted)return;
+
+    finalText="";
+    starting=true;
+    const r=new R();
+    rec=r;
+
+    // One clean turn at a time: wait for a final result instead of
+    // restarting recognition while the browser is still deciding.
+    r.lang="ar-EG";
+    r.continuous=false;
+    r.interimResults=false;
+    r.maxAlternatives=1;
+
+    r.onstart=()=>{
+      if(rec!==r)return;
+      starting=false;
+      micState(true);
+      state("listening");
+      callState("سامعك...","اتكلم براحتك، وأنا مستنيك تكمّل");
+    };
+
     r.onresult=(e)=>{
       if(rec!==r)return;
-      let gotFinal=false;
+      const parts=[];
       for(let i=e.resultIndex;i<e.results.length;i++){
-        const t=(e.results[i][0]?.transcript||"").trim();
-        if(t&&e.results[i].isFinal){finalText+=(finalText?" ":"")+t;gotFinal=true}
+        const result=e.results[i];
+        const t=(result?.[0]?.transcript||"").trim();
+        if(t&&result.isFinal)parts.push(t);
       }
-      if(finalText)callState("سامعك...","مستنيك تكمّل كلامك");
-      if(gotFinal){
-        clearTimer();
-        silenceTimer=setTimeout(()=>{
-          const text=finalText.trim();finalText="";
-          if(text)sendCall(text);
-        },1400);
-      }
+      const text=parts.join(" ").replace(/\\s+/g," ").trim();
+      if(!text)return;
+
+      finalText=text;
+      clearTimer();
+
+      // Give the recognition engine a short moment to finish the turn,
+      // then send exactly once.
+      silenceTimer=setTimeout(()=>{
+        if(rec!==r||!inCall||muted||speaking||sendInProgress)return;
+        const message=finalText.trim();
+        finalText="";
+        try{r.abort()}catch(e){}
+        rec=null;
+        micState(false);
+        if(message)sendCall(message);
+      },650);
     };
+
     r.onerror=(e)=>{
       if(rec!==r)return;
-      stopRec();
-      if(inCall&&!speaking&&!muted&&e?.error!=="aborted"){callState("جاهز","اتكلم تاني لما تكون جاهز");setTimeout(listen,700)}
+      clearTimer();
+      rec=null;
+      starting=false;
+      micState(false);
+
+      // "no-speech"/"aborted" are not fatal. Do not create a rapid
+      // listen -> thinking -> listen loop.
+      if(!inCall||muted||speaking||sendInProgress)return;
+      if(e?.error==="not-allowed"||e?.error==="service-not-allowed"){
+        callState("الميكروفون محتاج إذن","اسمح بالميكروفون من إعدادات الموقع.");
+        return;
+      }
+      if(e?.error==="network"){
+        callState("مشكلة في التعرف على الصوت","حاول تتكلم مرة تانية.");
+      }
+      scheduleListen(e?.error==="no-speech"?350:700);
     };
+
     r.onend=()=>{
       if(rec!==r)return;
-      rec=null;starting=false;micState(false);
-      if(finalText.trim()&&!speaking&&!muted){
-        const text=finalText.trim();finalText="";clearTimer();sendCall(text);return;
+      rec=null;
+      starting=false;
+      micState(false);
+
+      // If a final result is pending, let the send timer handle it.
+      if(finalText.trim()){
+        clearTimer();
+        const message=finalText.trim();
+        finalText="";
+        if(inCall&&!muted&&!speaking&&!sendInProgress){
+          sendCall(message);
+        }
+        return;
       }
-      if(inCall&&!speaking&&!muted)setTimeout(listen,450);
+
+      // Recognition can end by itself after a normal turn. Start a new
+      // turn only when we are truly idle.
+      if(inCall&&!muted&&!speaking&&!sendInProgress){
+        scheduleListen(550);
+      }
     };
-    try{r.start()}catch(e){starting=false;rec=null;micState(false);setTimeout(listen,600)}
-  }
-  async function sendCall(text){
-    if(!text||!inCall)return;
-    stopRec();state("thinking");callState("CodeMind بيفكر...","لحظة وأنا أجهز الرد");
+
     try{
-      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({message:text,mode:"code",history:history.slice(-20),webSearch:false})});
-      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"request_failed");
-      const reply=String(d.reply||"").trim();if(!reply)throw new Error("empty_reply");
-      history.push({role:"user",content:text},{role:"assistant",content:reply});history=history.slice(-20);speak(reply);
-    }catch(e){state("");callState("حصل خطأ في الاتصال","حاول مرة تانية.");if(inCall)setTimeout(listen,1000)}
+      r.start();
+    }catch(e){
+      starting=false;
+      rec=null;
+      micState(false);
+      scheduleListen(700);
+    }
   }
+
+  async function sendCall(text){
+    if(!text||!inCall||sendInProgress)return;
+
+    sendInProgress=true;
+    callTurnId++;
+    stopRec();
+    state("thinking");
+    callState("CodeMind بيفكر...","لحظة وأنا أجهز الرد");
+
+    try{
+      const r=await fetch("/api/chat",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        credentials:"same-origin",
+        body:JSON.stringify({
+          message:text,
+          mode:"code",
+          history:history.slice(-20),
+          webSearch:false
+        })
+      });
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.message||"request_failed");
+
+      const reply=String(d.reply||"").trim();
+      if(!reply)throw new Error("empty_reply");
+
+      history.push(
+        {role:"user",content:text},
+        {role:"assistant",content:reply}
+      );
+      history=history.slice(-20);
+
+      sendInProgress=false;
+      await speak(reply);
+    }catch(e){
+      sendInProgress=false;
+      state("");
+      callState("حصل خطأ في الاتصال","حاول مرة تانية.");
+      if(inCall&&!muted)scheduleListen(900);
+    }
+  }
+
   function splitSpeechText(text){
     const clean=String(text||"").replace(/[*_#>]/g," ").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu," ").replace(/\s+/g," ").trim();
     if(!clean)return [];
@@ -3965,13 +4084,30 @@ resizeTextarea();
     callState("المكالمة بدأت","خد وقتك... أنا سامعك");setTimeout(listen,450);
   }
   function closeCall(){
-    inCall=false;stopRec();finalText="";try{synth&&synth.cancel()}catch(e){}speaking=false;
+    inCall=false;
+    callTurnId++;
+    stopRec();
+    finalText="";
+    clearTimer();
+    clearListenTimer();
+    try{synth&&synth.cancel()}catch(e){}
+    speaking=false;
+    sendInProgress=false;
     document.body.classList.remove("voice-call-active");screen.classList.remove("open");screen.setAttribute("aria-hidden","true");state("");
   }
   if(call)call.addEventListener("click",()=>{if(menu)menu.classList.remove("show");openCall()});
   if(close)close.addEventListener("click",closeCall);if(end)end.addEventListener("click",closeCall);
   if(mute)mute.addEventListener("click",()=>{muted=!muted;mute.classList.toggle("muted",muted);if(muted){stopRec();state("");callState("الميكروفون مكتوم","اضغط الزر لإلغاء الكتم")}else setTimeout(listen,350)});
-  if(speaker)speaker.addEventListener("click",()=>{if(synth&&synth.speaking){try{synth.cancel()}catch(e){}speaking=false;state("");callState("جاهز","اتكلم لما تكون جاهز");setTimeout(listen,450)}});
+  if(speaker)speaker.addEventListener("click",()=>{
+    // Cloud TTS uses HTMLAudioElement instances; keep this button as a
+    // simple speech-state control without touching the browser TTS engine.
+    if(speaking){
+      speaking=false;
+      state("");
+      callState("جاهز","اتكلم لما تكون جاهز");
+      scheduleListen(350);
+    }
+  });
   let mediaRecorder=null,mediaChunks=[],mediaStream=null,mediaTimer=null,recordingBase="";
   function insertTranscript(text){const cleaned=String(text||"").trim();if(!cleaned)return;ta.value=[recordingBase,cleaned].filter(Boolean).join(" ");ta.dispatchEvent(new Event("input",{bubbles:true}));ta.focus()}
   async function transcribeRecordedAudio(blob){
