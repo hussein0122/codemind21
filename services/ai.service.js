@@ -5,6 +5,8 @@ import { getAiSettings } from './auth.service.js';
 const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_MAX_TOKENS = 2400;
 const DEFAULT_PROJECT_MAX_TOKENS = 2200;
+const PROVIDER_TIMEOUT_MS = 45000;
+const providerCooldownUntil = new Map();
 
 const persona = `أنت CodeMind AI، تم تطويرك وبرمجتك بواسطة باشمهندس حسين. لا تقل إنك ChatGPT أو من OpenAI أو Meta. أنت مساعد برمجي وتقني ودود ومتخصص في البرمجة، تطوير الويب، الشبكات، الدعم التقني والأمن السيبراني الدفاعي. أجب بلغة المستخدم وبنفس مستوى الرسمية تقريبًا. إذا تحدث المستخدم بالمصرية فاستخدم المصرية الطبيعية بدون مبالغة. اجعل لك أسلوبًا إنسانيًا دافئًا: افهم السياق، اعرف تمزح بخفة عندما يكون السياق مناسبًا، وكن جادًا في الأسئلة الجادة. يمكنك استخدام إيموجي قليلة ومناسبة للسياق مثل 😂😄🔥❤️👍، ولا تستخدمها في كل جملة أو في المواضيع الرسمية. لا تدّع أن لديك مشاعر حقيقية؛ عبّر عن التعاطف بأسلوب لغوي فقط. لا تكرر النكات أو العبارات نفسها. إذا كان المستخدم غاضبًا أو متضايقًا، ابدأ بالتفهم ثم الحل. كن مختصرًا ومباشرًا: ابدأ بالحل، استخدم نقاطًا قليلة، ولا تكرر السؤال أو تضف مقدمة طويلة. افتراضيًا اجعل الإجابة قصيرة، ووسّع فقط إذا طلب المستخدم شرحًا أو كان الحل يحتاج تفاصيل. في الكود أعطِ أقل شرح ضروري مع كود قابل للاستخدام. لا تدّع البحث أو تشغيل الكود إن لم يحدث فعليًا، ولا تضع أسرارًا حقيقية داخل الكود.`;
 
@@ -62,19 +64,60 @@ function clampOutput(value, fallback, min = 256, max = 8000) {
   return Number.isFinite(n) ? Math.min(Math.max(Math.floor(n), min), max) : fallback;
 }
 
-function normalizeOpenAIResponse(data) {
-  return { choices: [{ message: { content: data?.choices?.[0]?.message?.content || '' } }] };
+function makeProviderError(message, status = 0, details = {}) {
+  const error = new Error(message || 'Provider request failed');
+  error.status = Number(status) || 0;
+  Object.assign(error, details);
+  return error;
 }
 
-async function callOpenAICompatible({ baseURL, apiKey, model, messages, maxTokens, temperature, structured, headers = {} }) {
+function retryAfterMs(response) {
+  const raw = response?.headers?.get?.('retry-after');
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, Math.min(seconds * 1000, 120000));
+  const date = Date.parse(raw);
+  return Number.isFinite(date) ? Math.max(0, Math.min(date - Date.now(), 120000)) : 0;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = PROVIDER_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw makeProviderError('Provider request timed out', 408, { code: 'timeout' });
+    }
+    throw makeProviderError(error?.message || 'Provider network error', 0, {
+      code: 'network_error',
+      cause: error
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeOpenAIResponse(data) {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw makeProviderError('Provider returned an empty response', 502, { code: 'empty_response' });
+  }
+  return { choices: [{ message: { content } }] };
+}
+
+async function callOpenAICompatible({ provider, baseURL, apiKey, model, messages, maxTokens, temperature, structured, headers = {}, supportsJsonMode = true }) {
   const body = {
     model,
     messages,
-    max_completion_tokens: maxTokens,
     temperature,
     stream: false
   };
-  if (structured) {
+
+  // NVIDIA's current OpenAI-compatible examples use max_tokens, while
+  // OpenAI's Chat Completions endpoint accepts max_completion_tokens.
+  body[provider === 'openai' ? 'max_completion_tokens' : 'max_tokens'] = maxTokens;
+  if (structured && supportsJsonMode) {
     // Keep structured prompts immutable; pass the JSON instruction in the request body.
     body.response_format = { type: 'json_object' };
     const systemIndex = messages.findIndex((m) => m.role === 'system');
@@ -85,29 +128,39 @@ async function callOpenAICompatible({ baseURL, apiKey, model, messages, maxToken
     }
   }
 
-  const response = await fetch(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
+  const response = await fetchWithTimeout(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data?.error?.message || `Provider request failed: ${response.status}`);
-    error.status = response.status;
-    error.provider = data?.error?.type || data?.error?.code;
-    throw error;
+    throw makeProviderError(data?.error?.message || `Provider request failed: ${response.status}`, response.status, {
+      provider,
+      code: data?.error?.code || data?.error?.type,
+      retryAfterMs: retryAfterMs(response)
+    });
   }
   return normalizeOpenAIResponse(data);
 }
 
-async function callGemini({ apiKey, model, messages, maxTokens, temperature, structured }) {
+async function callGemini({ apiKey, model, messages, maxTokens, temperature, structured, imageAttachments = [] }) {
   const system = messages.find((m) => m.role === 'system')?.content || '';
+  const imageParts = imageAttachments.slice(0, 3).map((item) => {
+    const match = String(item.dataUrl || '').match(/^data:(image\\/[^;]+);base64,(.+)$/);
+    return match ? { inlineData: { mimeType: match[1], data: match[2] } } : null;
+  }).filter(Boolean);
   const contents = messages
     .filter((m) => m.role !== 'system')
-    .map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
-    }));
+    .map((m, index, all) => {
+      const isLastUser = index === all.length - 1 && m.role === 'user';
+      const parts = [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }];
+      if (isLastUser && imageParts.length) parts.push(...imageParts);
+      return {
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts
+      };
+    });
 
   const body = {
     systemInstruction: { parts: [{ text: system }] },
@@ -119,18 +172,21 @@ async function callGemini({ apiKey, model, messages, maxTokens, temperature, str
     }
   };
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data?.error?.message || `Gemini request failed: ${response.status}`);
-    error.status = response.status;
-    throw error;
+    throw makeProviderError(data?.error?.message || `Gemini request failed: ${response.status}`, response.status, {
+      provider: 'gemini',
+      code: data?.error?.code || data?.error?.status,
+      retryAfterMs: retryAfterMs(response)
+    });
   }
   const content = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
+  if (!content.trim()) throw makeProviderError('Gemini returned an empty response', 502, { code: 'empty_response', provider: 'gemini' });
   return { choices: [{ message: { content } }] };
 }
 
@@ -171,7 +227,7 @@ function providerModels(settings) {
   return {
     groq: settings?.model || process.env.GROQ_MODEL || DEFAULT_MODEL,
     openai: process.env.OPENAI_MODEL || 'gpt-5-mini',
-    gemini: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+    gemini: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
     nvidia: process.env.NVIDIA_MODEL || 'openai/gpt-oss-120b'
   };
@@ -187,7 +243,7 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
 
   if (provider === 'groq' || provider === 'openai') {
     const prepared = messages.map((message) => ({ ...message }));
-    if (hasImages && provider === 'groq' && prepared.length) {
+    if (hasImages && prepared.length && ['groq', 'openai', 'nvidia'].includes(provider)) {
       const last = prepared[prepared.length - 1];
       if (last.role === 'user') {
         const imageParts = imageAttachments.slice(0, 3).map((item) => ({
@@ -204,7 +260,9 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
       messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...prepared.filter((m) => m.role !== 'system')],
       maxTokens,
       temperature,
-      structured
+      structured,
+      supportsJsonMode: true,
+      provider
     });
   }
 
@@ -216,7 +274,9 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
       messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...messages.filter((m) => m.role !== 'system')],
       maxTokens,
       temperature,
-      structured
+      structured,
+      supportsJsonMode: false,
+      provider: 'nvidia'
     });
   }
 
@@ -227,7 +287,8 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
       messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...messages.filter((m) => m.role !== 'system')],
       maxTokens,
       temperature,
-      structured
+      structured,
+      imageAttachments
     });
   }
 
@@ -243,7 +304,35 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
 
 function shouldFallback(error) {
   const status = Number(error?.status);
-  return status === 401 || status === 403 || status === 408 || status === 409 || status === 413 || status === 429 || status >= 500;
+  const code = String(error?.code || '').toLowerCase();
+
+  // Network failures/timeouts should move to another provider immediately.
+  if (!status || code === 'network_error' || code === 'timeout') return true;
+
+  // Provider/model/auth/quota failures should not break the whole chat.
+  // 400/422 are only considered fallback-worthy when the provider explicitly
+  // says the requested model/feature is unavailable or unsupported.
+  if (status === 400 || status === 422) {
+    return /model|unsupported|not[_ -]?found|invalid[_ -]?model|response[_ -]?format|feature/i.test(code + ' ' + String(error?.message || ''));
+  }
+
+  return [401, 403, 404, 408, 409, 413, 429, 498, 499, 500, 502, 503, 504].includes(status) || status >= 500;
+}
+
+function cooldownProvider(provider, error) {
+  const status = Number(error?.status);
+  if (![401, 403, 404, 408, 429, 500, 502, 503, 504].includes(status)) return;
+  const retryMs = Number(error?.retryAfterMs) || (status === 429 ? 15000 : status >= 500 ? 5000 : 30000);
+  providerCooldownUntil.set(provider, Date.now() + Math.min(Math.max(retryMs, 1000), 120000));
+}
+
+function isProviderCoolingDown(provider) {
+  const until = providerCooldownUntil.get(provider) || 0;
+  if (until <= Date.now()) {
+    providerCooldownUntil.delete(provider);
+    return false;
+  }
+  return true;
 }
 
 export async function createAiClient() {
@@ -298,33 +387,57 @@ export async function createCompletion({ messages, mode, structured = false, ima
   if (!order.length) throw new Error('AI_NOT_CONFIGURED');
 
   let lastError = null;
+  const compactRetryProviders = [];
+
   for (const provider of order) {
+    if (isProviderCoolingDown(provider)) {
+      console.warn(`AI provider ${provider} skipped because it is temporarily cooling down.`);
+      continue;
+    }
+
     try {
       const result = await callProvider(provider, { messages, mode, structured, imageAttachments, settings });
       console.log(`CodeMind AI provider: ${provider}`);
       return result;
     } catch (error) {
       lastError = error;
-      console.warn(`AI provider ${provider} failed:`, error?.status || error?.message || error);
-      if (!shouldFallback(error)) throw error;
+      cooldownProvider(provider, error);
+      console.warn(`AI provider ${provider} failed:`, error?.status || error?.code || error?.message || error);
 
-      // Keep project generation alive under provider TPM/rate limits by retrying the
-      // same request on the next configured brain with compact context.
-      if (provider === order[order.length - 1]) break;
+      // A payload-size failure can often be solved by trimming conversation
+      // context. Do not repeat quota/rate-limit failures against the same provider.
+      if (Number(error?.status) === 413 || Number(error?.status) === 422) {
+        compactRetryProviders.push(provider);
+      }
+
+      if (!shouldFallback(error)) throw error;
     }
   }
 
-  // One final compact fallback on the first available provider.
-  if (lastError) {
+  // Second pass only for providers that failed because the request was too large
+  // or could not be processed with the original context. Keep the system prompt
+  // and structured mode intact; never resend every quota-failed provider.
+  if (compactRetryProviders.length) {
     const lastUser = [...messages].reverse().find((item) => item.role === 'user');
-    const compactMessages = lastUser ? [{ role: 'user', content: typeof lastUser.content === 'string' ? lastUser.content.slice(-9000) : lastUser.content }] : messages.slice(-1);
-    for (const provider of order) {
+    const compactMessages = [
+      { role: 'user', content: typeof lastUser?.content === 'string' ? lastUser.content.slice(-9000) : lastUser?.content }
+    ].filter((item) => item.content);
+
+    for (const provider of compactRetryProviders) {
       try {
-        return await callProvider(provider, { messages: compactMessages, mode, structured, imageAttachments: [], settings });
+        return await callProvider(provider, {
+          messages: compactMessages,
+          mode,
+          structured,
+          imageAttachments: [],
+          settings
+        });
       } catch (error) {
         lastError = error;
+        cooldownProvider(provider, error);
       }
     }
   }
+
   throw lastError || new Error('AI_REQUEST_FAILED');
 }
