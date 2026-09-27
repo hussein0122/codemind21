@@ -22,7 +22,8 @@ const PROVIDERS = {
   groq: { env: 'GROQ_API_KEY', label: 'Groq' },
   openai: { env: 'OPENAI_API_KEY', label: 'OpenAI' },
   gemini: { env: 'GEMINI_API_KEY', label: 'Google Gemini' },
-  anthropic: { env: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude' }
+  anthropic: { env: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude' },
+  nvidia: { env: 'NVIDIA_API_KEY', label: 'NVIDIA NIM' }
 };
 
 export function getConfiguredProviders() {
@@ -44,9 +45,9 @@ function providerOrder(mode, structured, hasImages) {
 
   // Automatic routing: use Gemini for image/multimodal work, OpenAI/Claude for
   // deeper coding, and Groq for normal fast chat. Every route has fallbacks.
-  if (hasImages) order.push('gemini', 'openai', 'groq', 'anthropic');
-  else if (structured || ['code', 'codeExpert', 'reason'].includes(mode)) order.push('openai', 'anthropic', 'groq', 'gemini');
-  else order.push('groq', 'gemini', 'openai', 'anthropic');
+  if (hasImages) order.push('gemini', 'openai', 'groq', 'nvidia', 'anthropic');
+  else if (structured || ['code', 'codeExpert', 'reason'].includes(mode)) order.push('openai', 'nvidia', 'groq', 'gemini', 'anthropic');
+  else order.push('groq', 'gemini', 'nvidia', 'openai', 'anthropic');
 
   return [...new Set(order)].filter((id) => configured.has(id));
 }
@@ -161,7 +162,8 @@ function providerModels(settings) {
     groq: settings?.model || process.env.GROQ_MODEL || DEFAULT_MODEL,
     openai: process.env.OPENAI_MODEL || 'gpt-5-mini',
     gemini: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
-    anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+    anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    nvidia: process.env.NVIDIA_MODEL || 'openai/gpt-oss-120b'
   };
 }
 
@@ -190,6 +192,18 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
       apiKey: process.env[provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'],
       model: models[provider],
       messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...prepared.filter((m) => m.role !== 'system')],
+      maxTokens,
+      temperature,
+      structured
+    });
+  }
+
+  if (provider === 'nvidia') {
+    return callOpenAICompatible({
+      baseURL: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+      apiKey: process.env.NVIDIA_API_KEY,
+      model: models.nvidia,
+      messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...messages.filter((m) => m.role !== 'system')],
       maxTokens,
       temperature,
       structured
