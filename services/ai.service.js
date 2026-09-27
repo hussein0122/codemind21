@@ -1,3 +1,4 @@
+// Fix: keep provider service syntax clean for Vercel Node ESM.
 import OpenAI, { toFile } from 'openai';
 import { getAiSettings } from './auth.service.js';
 
