@@ -21,7 +21,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
-// Vercel forwards the client IP through X-Forwarded-For. Trust the first proxy hop.\napp.set('trust proxy', 1);
+// Vercel forwards the client IP through X-Forwarded-For. Trust the first proxy hop.
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 // Explicitly allow microphone/camera access for the top-level CodeMind page.
 // Browsers can reject getUserMedia with NotAllowedError when Permissions Policy blocks the device.
