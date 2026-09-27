@@ -73,7 +73,7 @@ async function callOpenAICompatible({ baseURL, apiKey, model, messages, maxToken
     temperature,
     stream: false
   };
-  if (structured) body.response_format = { type: 'json_object' };
+  if (structured) {\n    body.response_format = { type: 'json_object' };\n    const systemIndex = messages.findIndex((m) => m.role === 'system');\n    if (systemIndex >= 0 && typeof messages[systemIndex].content === 'string' && !/\\bjson\\b/i.test(messages[systemIndex].content)) {\n      messages = messages.map((m, i) => i === systemIndex ? { ...m, content: `${m.content}\\n\\nأخرج النتيجة بصيغة JSON صحيحة فقط (valid JSON).` } : m);\n    }\n  }
 
   const response = await fetch(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
