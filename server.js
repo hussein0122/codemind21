@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
-if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
+// Vercel forwards the client IP through X-Forwarded-For. Trust the first proxy hop.\napp.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 // Explicitly allow microphone/camera access for the top-level CodeMind page.
 // Browsers can reject getUserMedia with NotAllowedError when Permissions Policy blocks the device.
@@ -187,6 +187,7 @@ app.get('/health', async (req, res) => {
   res.status(database.connected || !database.configured ? 200 : 503).json({
   ok: database.connected || !database.configured,
   ai: isAiConfigured(),
+  aiProviders: getConfiguredProviders(),
   database: database.connected ? 'connected' : (database.configured ? 'error' : 'disabled'),
   usersTable: database.usersTable === true,
   memory: 'conversation_context',
