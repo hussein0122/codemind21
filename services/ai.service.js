@@ -147,7 +147,7 @@ async function callOpenAICompatible({ provider, baseURL, apiKey, model, messages
 async function callGemini({ apiKey, model, messages, maxTokens, temperature, structured, imageAttachments = [] }) {
   const system = messages.find((m) => m.role === 'system')?.content || '';
   const imageParts = imageAttachments.slice(0, 3).map((item) => {
-    const match = String(item.dataUrl || '').match(/^data:(image\\/[^;]+);base64,(.+)$/);
+    const match = String(item.dataUrl || '').match(/^data:(image\/[^;]+);base64,(.+)$/);
     return match ? { inlineData: { mimeType: match[1], data: match[2] } } : null;
   }).filter(Boolean);
   const contents = messages
@@ -196,7 +196,7 @@ async function callAnthropic({ apiKey, model, messages, maxTokens, temperature, 
     .filter((m) => m.role !== 'system')
     .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }));
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -220,6 +220,7 @@ async function callAnthropic({ apiKey, model, messages, maxTokens, temperature, 
     throw error;
   }
   const content = data?.content?.map((item) => item.type === 'text' ? item.text : '').join('') || '';
+  if (!content.trim()) throw makeProviderError('Anthropic returned an empty response', 502, { code: 'empty_response', provider: 'anthropic' });
   return { choices: [{ message: { content } }] };
 }
 
