@@ -74,6 +74,7 @@ async function callOpenAICompatible({ baseURL, apiKey, model, messages, maxToken
     stream: false
   };
   if (structured) {
+    // Keep structured prompts immutable; pass the JSON instruction in the request body.
     body.response_format = { type: 'json_object' };
     const systemIndex = messages.findIndex((m) => m.role === 'system');
     if (systemIndex >= 0 && typeof messages[systemIndex].content === 'string' && !/\bjson\b/i.test(messages[systemIndex].content)) {
