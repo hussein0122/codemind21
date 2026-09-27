@@ -18,14 +18,14 @@ const modes = {
   net: 'أنت Network Engineer متخصص في CCNA وCCNP وCisco وLinux Networking. اشرح بخطوات عملية مختصرة.',
   networking: 'أنت Network Engineer متخصص في CCNA وCCNP وCisco وLinux Networking. اشرح بخطوات عملية مختصرة.',
   sec: 'أنت Cybersecurity Expert دفاعي يركز على OWASP وhardening. قدم خطوات آمنة ومختصرة.',
-  cybersecurity: 'أنت Cybersecurity Expert دفاعي يركز على OWASP وhardening. قدم خطوات آمنة ومختصرة.'
+  cybersecurity: 'أنت Cybersecurity Expert دفاعي يركز على OWASP وhardening. قدم خطوات آمنة ومختصرة.',
+  web: 'اعتمد على معلومات البحث المرفقة للإجابة عن المعلومات الحديثة. ميّز بين الحقائق المؤكدة والمعلومات غير المؤكدة، ولا تدّعِ أنك بحثت بنفسك إذا لم تكن نتائج البحث موجودة.'
 };
 
 const PROVIDERS = {
   groq: { env: 'GROQ_API_KEY', label: 'Groq' },
   openai: { env: 'OPENAI_API_KEY', label: 'OpenAI' },
   gemini: { env: 'GEMINI_API_KEY', label: 'Google Gemini' },
-  anthropic: { env: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude' },
   nvidia: { env: 'NVIDIA_API_KEY', label: 'NVIDIA NIM' }
 };
 
@@ -44,14 +44,20 @@ function providerOrder(mode, structured, hasImages) {
   const forced = String(process.env.CODEMIND_PRIMARY_PROVIDER || '').toLowerCase();
   const order = [];
 
-  if (forced && configured.has(forced)) order.push(forced);
+  // Task-based routing: one primary provider per task, then explicit fallbacks.
+  if (hasImages) order.push('gemini', 'openai', 'groq', 'nvidia');
+  else if (structured || ['code', 'codeExpert'].includes(mode)) order.push('openai', 'nvidia', 'groq', 'gemini');
+  else if (mode === 'reason') order.push('openai', 'nvidia', 'gemini', 'groq');
+  else if (mode === 'web') order.push('gemini', 'groq', 'openai', 'nvidia');
+  else if (['net', 'networking', 'sec', 'cybersecurity'].includes(mode)) order.push('nvidia', 'openai', 'groq', 'gemini');
+  else if (mode === 'fast') order.push('groq', 'nvidia', 'gemini', 'openai');
+  else order.push('groq', 'gemini', 'nvidia', 'openai');
 
-  // Automatic routing: use Gemini for image/multimodal work, OpenAI/Claude for
-  // deeper coding, and Groq for normal fast chat. Every route has fallbacks.
-  if (hasImages) order.push('gemini', 'openai', 'groq', 'nvidia', 'anthropic');
-  else if (structured || ['code', 'codeExpert', 'reason'].includes(mode)) order.push('openai', 'nvidia', 'groq', 'gemini', 'anthropic');
-  else order.push('groq', 'gemini', 'nvidia', 'openai', 'anthropic');
-
+  // Optional manual override changes the primary provider only; it does not
+  // turn the system into load balancing.
+  if (forced && configured.has(forced)) {
+    return [forced, ...order.filter((id) => id !== forced)].filter((id) => configured.has(id));
+  }
   return [...new Set(order)].filter((id) => configured.has(id));
 }
 
@@ -229,7 +235,6 @@ function providerModels(settings) {
     groq: settings?.model || process.env.GROQ_MODEL || DEFAULT_MODEL,
     openai: process.env.OPENAI_MODEL || 'gpt-5-mini',
     gemini: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-    anthropic: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
     nvidia: process.env.NVIDIA_MODEL || 'openai/gpt-oss-120b'
   };
 }
@@ -293,14 +298,7 @@ async function callProvider(provider, { messages, mode, structured, imageAttachm
     });
   }
 
-  return callAnthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    model: models.anthropic,
-    messages: [{ role: 'system', content: buildSystemPrompt(mode) + (settings?.concise ? '\n\nالتزم بالإيجاز افتراضيًا.' : '') }, ...messages.filter((m) => m.role !== 'system')],
-    maxTokens,
-    temperature,
-    structured
-  });
+  throw makeProviderError('Unsupported AI provider: ' + provider, 400, { code: 'unsupported_provider' });
 }
 
 function shouldFallback(error) {
