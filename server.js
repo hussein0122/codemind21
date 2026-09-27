@@ -313,7 +313,8 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
       : attachmentOnlyPrompt + buildAttachmentContext(safeAttachments) + webContext;
     messages.push({ role: 'user', content: currentContent });
 
-    const completion = await createCompletion({ messages, mode, structured: projectRequest, imageAttachments });
+    const effectiveMode = webContext ? 'web' : mode;
+    const completion = await createCompletion({ messages, mode: effectiveMode, structured: projectRequest, imageAttachments });
     const rawReply = completion?.choices?.[0]?.message?.content || '';
     if (req.user && chatId) {
       try { await addConversationMessage(req.user.id, chatId, 'user', message.trim(), safeAttachments.map(({dataUrl,...item}) => item)); }
